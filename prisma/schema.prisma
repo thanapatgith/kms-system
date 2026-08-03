@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  CEO
+  HR
+  FINANCE
+  WAREHOUSE
+  SUPERVISOR
+  EMPLOYEE
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum LeaveType {
+  SICK
+  PERSONAL
+  MATERNITY
+  VACATION
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model Site {
+  id              String   @id @default(cuid())
+  siteName        String   @map("site_name")
+  locationDetails String   @map("location_details") @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  users           User[]
+
+  @@index([siteName])
+  @@map("sites")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  employeeCode  String?   @unique @map("employee_code")
+  name          String
+  age           Int?
+  gender        Gender?
+  role          Role      @default(EMPLOYEE)
+  phone         String?
+  email         String?   @unique
+  lineId        String?   @unique @map("line_id")
+  avatarUrl     String?   @map("avatar_url")
+  username      String    @unique
+  passwordHash  String    @map("password_hash")
+  
+  // ข้อมูลส่วนตัว & เอกสาร
+  idCardNumber  String?   @unique @map("id_card_number")
+  address       String?
+  dateOfBirth   DateTime? @map("date_of_birth")
+  
+  // ข้อมูลเฉพาะ รปภ. / เอกสารสำคัญ
+  thop7LicenseNo String?   @map("thop7_license_no") // ใบอนุญาต ธภ.7
+  thop7Expire    DateTime? @map("thop7_expire")
+  idCardUrl      String?   @map("id_card_url")
+  houseRegUrl    String?   @map("house_reg_url")
+  
+  // ความยินยอม PDPA
+  pdpaConsent    Boolean   @default(false) @map("pdpa_consent")
+  pdpaAcceptedAt DateTime? @map("pdpa_accepted_at")
+
+  siteId         String?   @map("site_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  
+  site           Site?     @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  leaveRequests  LeaveRequest[]
+  attendances    Attendance[]
+  incidentReports IncidentReport[]
+
+  @@index([siteId])
+  @@index([role])
+  @@map("users")
+}
+
+model LeaveRequest {
+  id           String      @id @default(cuid())
+  userId       String      @map("user_id")
+  leaveType    LeaveType   @map("leave_type")
+  startDate    DateTime    @map("start_date") @db.Date
+  durationDays Int         @map("duration_days")
+  reason       String      @db.Text
+  documentUrl  String?     @map("document_url")
+  status       LeaveStatus @default(PENDING)
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startDate])
+  @@index([status, startDate])
+  @@map("leave_requests")
+}
+
+model WebContent {
+  id         String   @id @default(cuid())
+  sectionKey String   @unique @map("section_key")
+  contentJson Json    @map("content_json")
+  bgImageUrl String?  @map("bg_image_url")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("web_contents")
+}
+
+model JobApplication {
+  id        String   @id @default(cuid())
+  name      String
+  contact   String
+  phone     String
+  position  String
+  resumeUrl String?  @map("resume_url")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([position])
+  @@map("job_applications")
+}
+
+model ContactInquiry {
+  id          String   @id @default(cuid())
+  name        String
+  contact     String
+  serviceType String   @map("service_type")
+  message     String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([serviceType])
+  @@map("contact_inquiries")
+}
+
+model Attendance {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  type      String   // "CHECK_IN" หรือ "CHECK_OUT"
+  latitude  Float
+  longitude Float
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("attendances")
+}
+
+model IncidentReport {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  message     String   @db.Text // ข้อความรายงาน (เช่น "ตรวจรอบพื้นที่เรียบร้อย ปกติครับ")
+  latitude    Float?
+  longitude   Float?
+  createdAt   DateTime @default(now()) @map("created_at")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("incident_reports")
+}

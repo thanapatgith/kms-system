@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #0F1A30;
+  color: #f8fafc;
+}
+
+html { scroll-behavior: smooth; }
+
+button, a { -webkit-tap-highlight-color: transparent; }
+
+/* Swiper 2 Rows Layout Style */
+.portfolio-swiper .swiper-wrapper {
+  flex-direction: row !important;
+}
+
+.portfolio-swiper .swiper-slide {
+  margin-top: 0px !important;
+  margin-bottom: 16px !important;
+}
