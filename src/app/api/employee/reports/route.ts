@@ -5,6 +5,7 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 // 1. ดึงประวัติการแจ้งเหตุการณ์ / รายงานการตรวจตรา (GET)
 export async function GET(req: Request) {

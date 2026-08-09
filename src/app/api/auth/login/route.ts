@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

@@ -6,6 +6,11 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // ป้องกันการทำ static generation บน API routes
+  experimental: {
+    workerThreads: false,
+    cpus: 1,
+  },
 };
 
 export default nextConfig;
