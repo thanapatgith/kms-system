@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = 'force-dynamic';
+
 // 1. ดึงข้อมูลพนักงานรายคน (GET)
 export async function GET(
   req: Request,

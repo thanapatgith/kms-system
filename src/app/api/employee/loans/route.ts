@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 
+export const dynamic = 'force-dynamic';
+
 let globalLoanStore: any[] = [
   {
     id: "LOAN-20260810-001",

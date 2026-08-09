@@ -4,6 +4,8 @@ import { getSession } from "@/lib/auth";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
+export const dynamic = 'force-dynamic';
+
 // 1. ดึงประวัติการแจ้งเหตุการณ์ / รายงานการตรวจตรา (GET)
 export async function GET(req: Request) {
   try {
