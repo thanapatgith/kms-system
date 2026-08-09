@@ -127,7 +127,7 @@ export default function EmployeeIncidentPage() {
 
           <nav className="flex items-center gap-2 flex-wrap justify-center text-sm font-semibold">
             <Link href="/employee/profile" className="px-3 py-2 hover:bg-slate-800 text-slate-300 rounded-lg transition">
-              หน้าแรก / โปรไฟล์
+              หน้าแรก
             </Link>
             <Link href="/employee/leaves" className="px-3 py-2 hover:bg-slate-800 text-slate-300 rounded-lg transition">
               ระบบลา

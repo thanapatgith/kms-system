@@ -149,25 +149,26 @@ model ContactInquiry {
 }
 
 model Attendance {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  type      String   // "CHECK_IN" หรือ "CHECK_OUT"
-  latitude  Float
-  longitude Float
-  createdAt DateTime @default(now()) @map("created_at")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@map("attendances")
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // "CHECK_IN" หรือ "CHECK_OUT"
+  latitude    Float
+  longitude   Float
+  images      String[] // เพิ่มบรรทัดนี้เพื่อเก็บลิสต์รายชื่อไฟล์รูปภาพ
+  createdAt   DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id])
 }
 
 model IncidentReport {
   id          String   @id @default(cuid())
   userId      String   @map("user_id")
-  message     String   @db.Text // ข้อความรายงาน (เช่น "ตรวจรอบพื้นที่เรียบร้อย ปกติครับ")
+  message     String   @db.Text 
   latitude    Float?
   longitude   Float?
+  images      String[] // <--- เพิ่มบรรทัดนี้เพื่อเก็บลิสต์รายชื่อไฟล์รูปภาพ
   createdAt   DateTime @default(now()) @map("created_at")
+  
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])

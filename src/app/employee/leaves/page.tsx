@@ -72,153 +72,120 @@ export default function EmployeeLeavesPage() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-slate-100 pb-12">
-      {/* Navbar */}
-      <header className="bg-slate-900 text-white shadow-md">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-3">
-            <span className="px-3 py-1 bg-orange-500 font-bold text-xs rounded-lg uppercase tracking-wider">
+    <div className="w-full min-h-screen bg-slate-100 pb-24">
+      {/* Header ด้านบน (ดีไซน์เดียวกับหน้าลงเวลาและโปรไฟล์) */}
+      <header className="bg-slate-900 text-white shadow-md sticky top-0 z-50">
+        <div className="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 bg-orange-500 font-bold text-[10px] rounded uppercase tracking-wider">
               EMPLOYEE
             </span>
-            <h1 className="text-lg font-bold">KMS Employee Portal</h1>
+            <h1 className="text-sm font-bold">ระบบลาพนักงาน</h1>
           </div>
-
-          <nav className="flex items-center gap-2 flex-wrap justify-center text-sm font-semibold">
-            <Link href="/employee/profile" className="px-3 py-2 hover:bg-slate-800 text-slate-300 rounded-lg transition">
-              หน้าแรก / โปรไฟล์
-            </Link>
-            <Link href="/employee/leaves" className="px-3 py-2 bg-slate-800 text-orange-400 rounded-lg">
-              ระบบลา
-            </Link>
-            <Link href="/employee/attendance" className="px-3 py-2 hover:bg-slate-800 text-slate-300 rounded-lg transition">
-              ลงเวลาทำงาน
-            </Link>
-            <Link href="/employee/shifts" className="px-3 py-2 hover:bg-slate-800 text-slate-300 rounded-lg transition">
-              ตารางเวร
-            </Link>
-          </nav>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 mt-8 space-y-6">
+      <main className="max-w-md mx-auto px-4 mt-4 space-y-4">
         
-        {/* Header Section */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 md:p-8 border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        {/* หัวข้อและปุ่มยื่นใบลา */}
+        <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">ระบบลาพนักงาน</h2>
-            <p className="text-sm text-slate-500 mt-1">ยื่นคำขอลาและตรวจสอบสถานะการอนุมัติย้อนหลัง</p>
+            <h2 className="text-sm font-bold text-slate-900">ยื่นคำขอลา</h2>
+            <p className="text-[11px] text-slate-500 mt-0.5">ลาป่วย, ลากิจ, ลาพักร้อน</p>
           </div>
           <button
             onClick={() => setShowModal(true)}
-            className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm rounded-xl shadow-md shadow-orange-500/20 transition cursor-pointer"
+            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
           >
             + ยื่นใบลาใหม่
           </button>
         </div>
 
         {successMsg && (
-          <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-sm font-medium text-center">
+          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-medium text-center">
             {successMsg}
           </div>
         )}
 
         {errorMsg && (
-          <div className="p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium text-center">
+          <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-medium text-center">
             {errorMsg}
           </div>
         )}
 
-        {/* Leaves Table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-100">
-            <h3 className="font-bold text-slate-800 text-base">ประวัติการยื่นใบลาของคุณ</h3>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-bold text-slate-600 tracking-wider">
-                  <th className="p-4 md:px-6">ประเภทการลา</th>
-                  <th className="p-4 md:px-6">วันที่เริ่มต้น / ระยะเวลา</th>
-                  <th className="p-4 md:px-6">เหตุผล</th>
-                  <th className="p-4 md:px-6 text-center">สถานะ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {loading ? (
-                  <tr>
-                    <td colSpan={4} className="p-8 text-center text-slate-500">
-                      กำลังโหลดข้อมูล...
-                    </td>
-                  </tr>
-                ) : leaves.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="p-8 text-center text-slate-500">
-                      ยังไม่มีประวัติการยื่นใบลา
-                    </td>
-                  </tr>
-                ) : (
-                  leaves.map((leave) => (
-                    <tr key={leave.id} className="hover:bg-slate-50/80 transition">
-                      <td className="p-4 md:px-6 font-bold text-slate-900">
-                        {leave.leaveType === "SICK" && "ลาป่วย"}
-                        {leave.leaveType === "PERSONAL" && "ลากิจ"}
-                        {leave.leaveType === "VACATION" && "ลาพักร้อน"}
-                        {leave.leaveType === "MATERNITY" && "ลาคลอด"}
-                      </td>
-                      <td className="p-4 md:px-6 text-slate-600 text-xs">
-                        {new Date(leave.startDate).toLocaleDateString("th-TH")} (ลา {leave.durationDays} วัน)
-                      </td>
-                      <td className="p-4 md:px-6 text-slate-600 max-w-xs truncate">
-                        {leave.reason || "-"}
-                      </td>
-                      <td className="p-4 md:px-6 text-center">
-                        {leave.status === "PENDING" && (
-                          <span className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full font-bold text-xs uppercase">
-                            รออนุมัติ
-                          </span>
-                        )}
-                        {leave.status === "APPROVED" && (
-                          <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-xs uppercase">
-                            อนุมัติแล้ว
-                          </span>
-                        )}
-                        {leave.status === "REJECTED" && (
-                          <span className="px-3 py-1 bg-red-50 text-red-600 border border-red-200 rounded-full font-bold text-xs uppercase">
-                            ไม่อนุมัติ
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+        {/* ประวัติการยื่นใบลาแบบ Mobile Card */}
+        <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 space-y-3">
+          <h3 className="text-xs font-bold text-slate-800 border-b border-slate-100 pb-2">
+            📋 ประวัติการยื่นใบลาของคุณ
+          </h3>
+
+          {loading ? (
+            <div className="text-center text-slate-400 py-6 text-xs animate-pulse">กำลังโหลดข้อมูล...</div>
+          ) : leaves.length === 0 ? (
+            <div className="text-center text-slate-400 py-6 text-xs">ยังไม่มีประวัติการยื่นใบลา</div>
+          ) : (
+            <div className="space-y-2.5">
+              {leaves.map((leave) => (
+                <div key={leave.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center text-xs">
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-slate-900 block text-sm">
+                      {leave.leaveType === "SICK" && "ลาป่วย"}
+                      {leave.leaveType === "PERSONAL" && "ลากิจ"}
+                      {leave.leaveType === "VACATION" && "ลาพักร้อน"}
+                      {leave.leaveType === "MATERNITY" && "ลาคลอด"}
+                    </span>
+                    <span className="text-[11px] text-slate-600 block">
+                      {new Date(leave.startDate).toLocaleDateString("th-TH")} (ลา {leave.durationDays} วัน)
+                    </span>
+                    <span className="text-[10px] text-slate-400 italic">
+                      เหตุผล: {leave.reason || "-"}
+                    </span>
+                  </div>
+                  <div>
+                    {leave.status === "PENDING" && (
+                      <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full font-bold text-[10px] uppercase">
+                        รออนุมัติ
+                      </span>
+                    )}
+                    {leave.status === "APPROVED" && (
+                      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] uppercase">
+                        อนุมัติแล้ว
+                      </span>
+                    )}
+                    {leave.status === "REJECTED" && (
+                      <span className="px-2.5 py-1 bg-red-50 text-red-600 border border-red-200 rounded-full font-bold text-[10px] uppercase">
+                        ไม่อนุมัติ
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
       </main>
 
       {/* Modal ยื่นใบลา */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 md:p-8 space-y-6">
-            <div className="flex justify-between items-center border-b pb-4">
-              <h3 className="text-xl font-bold text-slate-900">ยื่นคำขอลาใหม่</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold text-lg">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 space-y-4">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="text-sm font-bold text-slate-900">ยื่นคำขอลาใหม่</h3>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold text-sm cursor-pointer">
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3 text-xs">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase mb-2">ประเภทการลา *</label>
+                <label className="block font-semibold text-slate-600 uppercase mb-1">ประเภทการลา *</label>
                 <select
                   name="leaveType"
                   value={formData.leaveType}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-orange-500 outline-none"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-orange-500 outline-none"
                 >
                   <option value="SICK">ลาป่วย</option>
                   <option value="PERSONAL">ลากิจ</option>
@@ -227,9 +194,9 @@ export default function EmployeeLeavesPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-2">วันที่เริ่มต้น *</label>
+                  <label className="block font-semibold text-slate-600 uppercase mb-1">วันที่เริ่มต้น *</label>
                   <input
                     type="date"
                     name="startDate"
@@ -241,11 +208,11 @@ export default function EmployeeLeavesPage() {
                         (e.target as HTMLInputElement).showPicker();
                       } catch (err) {}
                     }}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-orange-500 outline-none cursor-pointer"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:ring-2 focus:ring-orange-500 outline-none cursor-pointer"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-2">จำนวนวันลา *</label>
+                  <label className="block font-semibold text-slate-600 uppercase mb-1">จำนวนวันลา *</label>
                   <input
                     type="number"
                     name="durationDays"
@@ -253,13 +220,13 @@ export default function EmployeeLeavesPage() {
                     required
                     value={formData.durationDays}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-orange-500 outline-none"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:ring-2 focus:ring-orange-500 outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase mb-2">เหตุผลความจำเป็น *</label>
+                <label className="block font-semibold text-slate-600 uppercase mb-1">เหตุผลความจำเป็น *</label>
                 <textarea
                   name="reason"
                   required
@@ -267,30 +234,50 @@ export default function EmployeeLeavesPage() {
                   value={formData.reason}
                   onChange={handleChange}
                   placeholder="ระบุเหตุผลในการลา..."
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-orange-500 outline-none resize-none"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:ring-2 focus:ring-orange-500 outline-none resize-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t">
+              <div className="flex justify-end gap-2 pt-2 border-t">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition cursor-pointer"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm rounded-xl shadow-md shadow-orange-500/20 transition disabled:opacity-50 cursor-pointer"
+                  className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md transition disabled:opacity-50 cursor-pointer"
                 >
-                  {submitting ? "กำลังส่งคำขอ..." : "ยืนยันการยื่นลา"}
+                  {submitting ? "กำลังส่ง..." : "ยืนยันการยื่นลา"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Bottom Navigation Bar (แถบเมนูด้านล่างสุดเพื่อให้กดสลับหน้าได้สะดวก) */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-2 py-2 flex justify-around items-center z-50 shadow-lg">
+        <Link href="/employee/profile" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
+          <span className="text-base mb-0.5">👤</span>
+          หน้าแรก
+        </Link>
+        <Link href="/employee/leaves" className="flex flex-col items-center text-orange-400 text-[10px] font-bold transition">
+          <span className="text-base mb-0.5">📝</span>
+          ระบบลา
+        </Link>
+        <Link href="/employee/attendance" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
+          <span className="text-base mb-0.5">⏱️</span>
+          ลงเวลาทำงาน
+        </Link>
+        <Link href="/employee/shifts" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
+          <span className="text-base mb-0.5">📅</span>
+          ตารางเวร
+        </Link>
+      </nav>
     </div>
   );
 }
