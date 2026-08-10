@@ -281,7 +281,6 @@ export default function Home() {
     if (rawHeroSlides) {
       const parsed = typeof rawHeroSlides === "string" ? JSON.parse(rawHeroSlides) : rawHeroSlides;
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // นำรูปภาพจากฐานข้อมูลมาใส่ในสไลด์ของทุกภาษา เพื่อให้พื้นหลังไม่หาย
         slides = slides.map((slide, index) => ({
           ...slide,
           image: parsed[index]?.image || slide.image,
@@ -469,21 +468,21 @@ export default function Home() {
 
   return (
     <main 
-  className="h-screen overflow-y-scroll snap-y scroll-smooth overflow-x-hidden bg-white text-slate-800"
-  style={{ scrollSnapType: 'y proximity' }}
->
+      className="h-screen overflow-y-scroll snap-y scroll-smooth overflow-x-hidden bg-white text-slate-800"
+      style={{ scrollSnapType: 'y proximity' }}
+    >
       <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-md shadow-sm">
         <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 lg:px-8" aria-label="Main navigation">
           <a href="#home" className="flex items-center gap-3">
-  {contents["site_logo"] ? (
-    <img src={contents["site_logo"]} alt="KMS Logo" className="h-11 w-auto object-contain rounded-md" />
-  ) : (
-    <span className="grid h-11 w-11 place-items-center rounded-md bg-security-orange text-sm font-black tracking-tighter text-white">KMS</span>
-  )}
-  <span className="hidden text-xs font-bold leading-tight tracking-wide text-slate-800 sm:block">
-    {contents["site_title"] ? contents["site_title"] : "KMS GUARD & SUPPLY GROUP CO., LTD."}
-  </span>
-</a>
+            {contents["site_logo"] ? (
+              <img src={contents["site_logo"]} alt="KMS Logo" className="h-11 w-auto object-contain rounded-md" />
+            ) : (
+              <span className="grid h-11 w-11 place-items-center rounded-md bg-security-orange text-sm font-black tracking-tighter text-white">KMS</span>
+            )}
+            <span className="hidden text-xs font-bold leading-tight tracking-wide text-slate-800 sm:block">
+              {contents["site_title"] ? contents["site_title"] : "KMS GUARD & SUPPLY GROUP CO., LTD."}
+            </span>
+          </a>
           <div className="hidden items-center gap-6 lg:flex">
             {t.nav.map(([id, label]) => {
               const sectionId = id.toLowerCase();
@@ -505,7 +504,7 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={nextLanguage} className="rounded border border-slate-300 px-2.5 py-2 text-xs font-bold text-slate-700 hover:border-security-orange hover:text-security-orange" aria-label="Change language">{language}</button>
-            <a href="/login" className="hidden rounded bg-security-orange px-4 py-2.5 text-sm font-bold text-white transition hover:bg-orange-600 sm:inline-block">{t.loginBtn}</a>
+            <a href="/login" className="inline-block rounded bg-security-orange px-3 py-2 text-xs font-bold text-white transition hover:bg-orange-600 sm:px-4 sm:py-2.5 sm:text-sm">{t.loginBtn}</a>
             <button onClick={() => setMenuOpen(!menuOpen)} className="grid h-10 w-10 place-items-center text-xl text-slate-800 lg:hidden" aria-expanded={menuOpen} aria-label="Toggle menu">☰</button>
           </div>
         </nav>
@@ -528,6 +527,12 @@ export default function Home() {
                   </a>
                 );
               })}
+              <a
+                href="/login"
+                className="mt-2 block w-full rounded bg-security-orange py-2.5 text-center text-sm font-bold text-white"
+              >
+                {t.loginBtn}
+              </a>
             </div>
           </div>
         )}
