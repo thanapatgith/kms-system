@@ -83,7 +83,6 @@ export default function EmployeeEquipmentPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  // ฟังก์ชันหา วันที่ปัจจุบัน ในรูปแบบ YYYY-MM-DD (Local Time)
   const getTodayString = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -92,7 +91,6 @@ export default function EmployeeEquipmentPage() {
     return `${year}-${month}-${day}`;
   };
 
-  // ตั้งค่าเริ่มต้นของตัวกรองเป็น ดูทั้งหมด หรือ วันนี้ ได้ตามต้องการ (ตั้งไว้เป็น ดูทั้งหมด เพื่อเห็นรายการประวัติ)
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
 
@@ -117,7 +115,10 @@ export default function EmployeeEquipmentPage() {
       const res = await fetch("/api/employee/equipment");
       const data = await res.json();
       if (data.ok) {
-        setRequests(data.requests || []);
+        const sorted = (data.requests || []).sort((a: any, b: any) => 
+          new Date(b.createdAt || b.date || 0).getTime() - new Date(a.createdAt || a.date || 0).getTime()
+        );
+        setRequests(sorted);
       }
     } catch (err) {
       console.error(err);
@@ -195,6 +196,8 @@ export default function EmployeeEquipmentPage() {
         reasonType: "NEW",
         reason: "",
       });
+      setFromDate("");
+      setToDate("");
       fetchRequests();
     } catch (err: any) {
       setErrorMsg(err.message || "เกิดข้อผิดพลาดในการเชื่อมต่อ");
@@ -203,11 +206,13 @@ export default function EmployeeEquipmentPage() {
     }
   };
 
-  // กรองตามช่วงวันที่โดยใช้เวลาท้องถิ่น
   const filteredRequests = requests.filter((item) => {
-    if (!item.createdAt) return true;
+    const dateStr = item.createdAt || item.date;
+    if (!dateStr) return true;
 
-    const d = new Date(item.createdAt);
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return true;
+
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
@@ -399,8 +404,6 @@ export default function EmployeeEquipmentPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-              
-              {/* รายการอุปกรณ์ที่ต้องการเบิก */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">รายการอุปกรณ์ *</label>
                 <select
@@ -418,7 +421,6 @@ export default function EmployeeEquipmentPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                {/* ขนาด / ไซส์ */}
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">ขนาด/ไซส์</label>
                   {selectedItemObj.hasSize ? (
@@ -444,7 +446,6 @@ export default function EmployeeEquipmentPage() {
                   )}
                 </div>
 
-                {/* จำนวน */}
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">จำนวน *</label>
                   <input
@@ -460,7 +461,6 @@ export default function EmployeeEquipmentPage() {
                 </div>
               </div>
 
-              {/* สาเหตุการเบิก */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">สาเหตุในการขอเบิก *</label>
                 <select
@@ -475,7 +475,6 @@ export default function EmployeeEquipmentPage() {
                 </select>
               </div>
 
-              {/* หมายเหตุเพิ่มเติม */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">หมายเหตุเพิ่มเติม</label>
                 <textarea

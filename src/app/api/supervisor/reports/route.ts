@@ -12,55 +12,55 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: "ไม่ได้เข้าสู่ระบบ" }, { status: 401 });
     }
 
-    // ตรวจสอบสิทธิ์เบื้องต้นว่าเป็น Supervisor หรือ Admin หรือไม่ (ปรับเงื่อนไขตาม Role จริงในระบบ)
-    const currentUser = await prisma.user.findUnique({
-      where: { id: session.userId },
-    });
-
-    if (!currentUser) {
-      return NextResponse.json({ ok: false, error: "ไม่พบข้อมูลผู้ใช้งาน" }, { status: 404 });
-    }
-
-    // ดึงรายงานการปฏิบัติงานทั้งหมด พร้อมข้อมูลพนักงานที่ส่ง
-    const incidentReports = await prisma.incidentReport.findMany({
-      include: {
-        user: {
-          select: { username: true, role: true, phone: true },
-        },
-      },
+    const reports = await prisma.incidentReport.findMany({
+      where: { userId: { not: session.userId } },
       orderBy: { createdAt: "desc" },
     });
 
-    // ดึงประวัติการลงเวลาทั้งหมด พร้อมข้อมูลพนักงาน
-    const attendances = await prisma.attendance.findMany({
-      include: {
-        user: {
-          select: { username: true, role: true },
-        },
-      },
-      orderBy: { createdAt: "desc" },
+    const userIds = Array.from(new Set(reports.map((r: any) => r.userId)));
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true, employeeCode: true, siteId: true },
     });
 
-    const formattedReports = incidentReports.map((item: any) => ({
-      id: item.id,
-      employeeName: item.user?.username || "ไม่ระบุชื่อ",
-      date: new Date(item.createdAt).toLocaleDateString("th-TH", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      }),
-      time: new Date(item.createdAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }),
-      message: item.message,
-      location: item.latitude && item.longitude ? `${item.latitude.toFixed(4)}, ${item.longitude.toFixed(4)}` : "-",
-    }));
+    // ดึงข้อมูล Site (หน่วยงาน) มาเผื่อไว้
+    const siteIds = Array.from(new Set(users.map((u: any) => u.siteId).filter(Boolean)));
+    const sites = await prisma.site ? await prisma.site.findMany({ where: { id: { in: siteIds } } }) : [];
+    const siteMap = new Map(sites.map((s: any) => [s.id, s.name]));
 
-    return NextResponse.json({
-      ok: true,
-      reports: formattedReports,
-      attendances: attendances,
+    const userMap = new Map(users.map((u: any) => [
+      u.id, 
+      { 
+        name: u.name || u.employeeCode || "เจ้าหน้าที่", 
+        siteName: u.siteId ? siteMap.get(u.siteId) || "-" : "-" 
+      }
+    ]));
+
+    const formatted = reports.map((item: any) => {
+      const userInfo: any = userMap.get(item.userId) || { name: "เจ้าหน้าที่ รปภ.", siteName: "-" };
+      return {
+        id: item.id,
+        employeeName: userInfo.name,
+        siteName: userInfo.siteName,
+        createdAt: item.createdAt,
+        date: new Date(item.createdAt).toLocaleDateString("th-TH", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        }),
+        time: new Date(item.createdAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }),
+        message: item.message,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        location: item.latitude && item.longitude ? `${item.latitude.toFixed(4)}, ${item.longitude.toFixed(4)}` : "-",
+        images: item.images || [],
+        status: item.status || "PENDING",
+      };
     });
+
+    return NextResponse.json({ ok: true, reports: formatted });
   } catch (error: any) {
-    console.error("Supervisor API error:", error);
+    console.error("Get supervisor reports error:", error);
     return NextResponse.json({ ok: false, error: error.message || "เกิดข้อผิดพลาด" }, { status: 500 });
   }
 }

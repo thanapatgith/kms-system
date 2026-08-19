@@ -14,8 +14,19 @@ export default function CreateReportPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // ดึงพิกัด GPS อัตโนมัติเมื่อเปิดหน้า
+  // State สำหรับหน่วยงาน
+  const [selectedBranch, setSelectedBranch] = useState("หน่วยงาน A (จุดประจำ)");
+  const [branchesList, setBranchesList] = useState<string[]>([
+    "หน่วยงาน A (จุดประจำ)",
+    "หน่วยงาน B (โซนอาคารสำนักงาน)",
+    "หน่วยงาน C (คลังสินค้า)",
+    "หน่วยงาน D (ประตูทางเข้าหลัก)",
+  ]);
+
+  // ดึงพิกัด GPS และโปรไฟล์เพื่อดึงหน่วยงานประจำ
   useEffect(() => {
+    fetchUserProfile();
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -32,20 +43,29 @@ export default function CreateReportPage() {
     }
   }, []);
 
-  // เมื่อมีการเลือก/ถ่ายรูปภาพ
+  const fetchUserProfile = async () => {
+    try {
+      const res = await fetch("/api/employee/profile");
+      const data = await res.json();
+      if (data.ok && data.user?.branch) {
+        setSelectedBranch(data.user.branch);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files);
       const newImages = [...images, ...selectedFiles];
       setImages(newImages);
 
-      // สร้าง Preview URL
       const newPreviews = selectedFiles.map((file) => URL.createObjectURL(file));
       setPreviews([...previews, ...newPreviews]);
     }
   };
 
-  // ลบรูปที่เลือก
   const removeImage = (index: number) => {
     const updatedImages = images.filter((_, i) => i !== index);
     const updatedPreviews = previews.filter((_, i) => i !== index);
@@ -53,7 +73,6 @@ export default function CreateReportPage() {
     setPreviews(updatedPreviews);
   };
 
-  // ข้อความด่วนสำหรับกดปุ๊บใส่ปั๊บ (Quick Templates)
   const applyQuickText = (text: string) => {
     if (message) {
       setMessage(message + " " + text);
@@ -76,6 +95,8 @@ export default function CreateReportPage() {
     try {
       const formData = new FormData();
       formData.append("message", message);
+      formData.append("branch", selectedBranch);
+
       if (location) {
         formData.append("latitude", location.lat.toString());
         formData.append("longitude", location.lng.toString());
@@ -91,11 +112,10 @@ export default function CreateReportPage() {
 
       const data = await res.json();
 
-      if (!res.ok || !data.ok) {
+      if (!res.ok || (!data.ok && !data.success)) {
         throw new Error(data.error || "เกิดข้อผิดพลาดในการส่งรายงาน");
       }
 
-      // แสดง Custom Modal แทน alert เดิม
       setShowSuccessModal(true);
     } catch (err: any) {
       setErrorMsg(err.message || "เกิดข้อผิดพลาดในการส่งข้อมูล");
@@ -111,7 +131,7 @@ export default function CreateReportPage() {
 
   return (
     <div className="w-full min-h-screen bg-slate-100 pb-24">
-      {/* Header ด้านบน */}
+      {/* Header */}
       <header className="bg-slate-900 text-white shadow-md sticky top-0 z-50">
         <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/employee/reports" className="text-xs text-slate-300 hover:text-white font-bold flex items-center gap-1">
@@ -133,13 +153,33 @@ export default function CreateReportPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           
+          {/* ส่วนระบุหน่วยงาน/สถานที่ปฏิบัติงาน */}
+          <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 space-y-2">
+            <label className="block text-xs font-bold text-slate-800 flex justify-between items-center">
+              <span>📍 เลือกหน่วยงานที่ปฏิบัติงาน *</span>
+              <span className="text-[10px] text-orange-600 font-semibold bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200">
+                จุดตรวจตรา
+              </span>
+            </label>
+            <select
+              value={selectedBranch}
+              onChange={(e) => setSelectedBranch(e.target.value)}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-orange-500 outline-none cursor-pointer"
+            >
+              {branchesList.map((branch, idx) => (
+                <option key={idx} value={branch}>
+                  {branch}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* 1. ปุ่มถ่ายรูป / เลือกรูปภาพ */}
           <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 space-y-3">
             <label className="block text-xs font-bold text-slate-800">
               📸 รูปภาพประกอบการตรวจตรา *
             </label>
 
-            {/* แสดงพรีวิวรูปที่เลือก */}
             {previews.length > 0 && (
               <div className="grid grid-cols-3 gap-2 mb-2">
                 {previews.map((src, idx) => (
@@ -226,7 +266,7 @@ export default function CreateReportPage() {
 
           {/* แสดงพิกัด GPS */}
           <div className="px-2 flex items-center justify-between text-[10px] text-slate-500">
-            <span>📍 พิกัด GPS:</span>
+            <span>📍 พิกัด GPS ยืนยันตำแหน่ง:</span>
             <span className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200">
               {location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : "กำลังค้นหาพิกัด..."}
             </span>
@@ -245,7 +285,7 @@ export default function CreateReportPage() {
 
       </main>
 
-      {/* Custom Popup Modal สไตล์เว็บไซต์ของเรา */}
+      {/* Modal สรุปผลส่งรายงานสำเร็จ */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-3xl p-6 max-w-xs w-full text-center space-y-4 shadow-2xl border border-slate-100">
@@ -254,8 +294,8 @@ export default function CreateReportPage() {
             </div>
             <div className="space-y-1">
               <h3 className="text-base font-bold text-slate-900">ส่งรายงานสำเร็จ!</h3>
-              <p className="text-xs text-slate-500">
-                ระบบได้บันทึกรายงานการตรวจตราและรูปภาพของคุณเรียบร้อยแล้ว
+              <p className="text-xs text-slate-500 leading-relaxed">
+                บันทึกรายงานตรวจตราของ <strong className="text-slate-800">{selectedBranch}</strong> เรียบร้อยแล้ว
               </p>
             </div>
             <button

@@ -6,8 +6,16 @@ import Link from "next/link";
 export default function EmployeeLoansPage() {
   const [loans, setLoans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hasActiveLoan, setHasActiveLoan] = useState(false);
-  const [activeLoanMsg, setActiveLoanMsg] = useState("");
+  
+  const [loanSummary, setLoanSummary] = useState({
+    targetRound: 20 as 20 | 30,
+    isWindowOpen: false,
+    workedDays: 10,
+    dailyWage: 520,
+    maxCredit: 0,
+    totalBorrowedThisMonth: 0,
+    remainingCredit: 0,
+  });
 
   const getTodayString = () => {
     const today = new Date();
@@ -29,10 +37,17 @@ export default function EmployeeLoansPage() {
       setLoading(true);
       const res = await fetch("/api/employee/loans");
       const data = await res.json();
-      if (data.ok) {
+      if (data.success) {
         setLoans(data.loans || []);
-        setHasActiveLoan(data.hasActiveLoan || false);
-        setActiveLoanMsg(data.activeLoanMessage || "");
+        setLoanSummary({
+          targetRound: data.targetRound || 20,
+          isWindowOpen: data.isWindowOpen,
+          workedDays: data.workedDays || 10,
+          dailyWage: data.dailyWage || 520,
+          maxCredit: data.maxCredit || 0,
+          totalBorrowedThisMonth: data.totalBorrowedThisMonth || 0,
+          remainingCredit: data.remainingCredit || 0,
+        });
       }
     } catch (err) {
       console.error("Fetch loans error:", err);
@@ -67,9 +82,10 @@ export default function EmployeeLoansPage() {
   };
 
   const filteredLoans = loans.filter((item) => {
-    if (!item.createdAt) return true;
+    const dateStr = item.created_at || item.createdAt;
+    if (!dateStr) return true;
 
-    const d = new Date(item.createdAt);
+    const d = new Date(dateStr);
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
@@ -80,6 +96,12 @@ export default function EmployeeLoansPage() {
 
     return true;
   });
+
+  // คำนวณยอดดอกเบี้ยรวมสะสมประจำเดือน
+  const totalInterestAmount = loanSummary.totalBorrowedThisMonth >= 4000 
+    ? loanSummary.totalBorrowedThisMonth * 0.05 
+    : 0;
+  const totalDeductionWithInterest = loanSummary.totalBorrowedThisMonth + totalInterestAmount;
 
   return (
     <div className="w-full min-h-screen bg-slate-100 pb-24">
@@ -98,40 +120,105 @@ export default function EmployeeLoansPage() {
       {/* Main Content */}
       <main className="max-w-md mx-auto px-4 mt-4 space-y-3">
         
-        {/* หัวข้อและปุ่มยื่นคำขอ */}
-        <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 flex justify-between items-center gap-3">
-          <div>
-            <h2 className="text-sm font-bold text-slate-900">การเงิน & สวัสดิการ</h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">เบิกเงินค่าจ้างล่วงหน้า หรือยื่นขอเงินกู้สวัสดิการ</p>
+        {/* การ์ดสรุปวงเงิน & สิทธิ์คงเหลือ */}
+        <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-lg space-y-3 relative overflow-hidden">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-[11px] text-slate-400 font-medium">
+                สิทธิ์กู้ยืมสูงสุด (85% ของค่าจ้าง {loanSummary.workedDays} วัน)
+              </p>
+              <h2 className="text-2xl font-extrabold text-orange-400 font-mono mt-0.5">
+                ฿{loanSummary.remainingCredit.toLocaleString()}
+                <span className="text-xs text-slate-300 font-normal ml-1">คงเหลือที่กู้ได้</span>
+              </h2>
+            </div>
+            <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full border ${
+              loanSummary.isWindowOpen 
+                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30 animate-pulse" 
+                : "bg-slate-800 text-slate-400 border-slate-700"
+            }`}>
+              {loanSummary.isWindowOpen 
+                ? `● รอบวันที่ ${loanSummary.targetRound} (เปิดรับยื่นเรื่อง)` 
+                : `🔒 รอบวันที่ ${loanSummary.targetRound} (ปิดรับคำร้อง)`}
+            </span>
           </div>
 
-          {hasActiveLoan ? (
+          <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-800 text-center text-xs">
+            <div className="bg-slate-800/60 p-2 rounded-xl">
+              <span className="block text-[10px] text-slate-400">คิดจากวันทำงาน</span>
+              <span className="font-bold text-white">{loanSummary.workedDays} วัน</span>
+            </div>
+            <div className="bg-slate-800/60 p-2 rounded-xl">
+              <span className="block text-[10px] text-slate-400">วงเงินกู้เต็มสิทธิ์</span>
+              <span className="font-bold text-white">฿{loanSummary.maxCredit.toLocaleString()}</span>
+            </div>
+            <div className="bg-slate-800/60 p-2 rounded-xl">
+              <span className="block text-[10px] text-slate-400">กู้ไปแล้วเดือนนี้</span>
+              <span className="font-bold text-amber-400">฿{loanSummary.totalBorrowedThisMonth.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ปุ่มยื่นคำขอ / สถานะช่วงเวลา */}
+        <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 flex justify-between items-center gap-3">
+          <div>
+            <h3 className="text-xs font-bold text-slate-900">
+              ยื่นคำร้องกู้ยืมเงิน (รอบวันที่ {loanSummary.targetRound})
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              {loanSummary.targetRound === 20 ? "เปิดยื่น 11-17 ของเดือน" : "เปิดยื่น 18-27 ของเดือน"}
+            </p>
+          </div>
+
+          {!loanSummary.isWindowOpen ? (
             <button
               disabled
-              title="คุณมีคำร้องรออนุมัติอยู่ ไม่สามารถยื่นเพิ่มได้"
-              className="px-3.5 py-2 bg-slate-300 text-slate-500 text-xs font-bold rounded-xl shrink-0 cursor-not-allowed border border-slate-300"
+              title="ไม่อยู่ในช่วงเวลาที่เปิดให้ยื่นกู้"
+              className="px-3.5 py-2 bg-slate-200 text-slate-400 text-xs font-bold rounded-xl shrink-0 cursor-not-allowed border border-slate-300"
             >
-              🔒 ยื่นเรื่องค้างอยู่
+              🔒 นอกช่วงเวลายื่นกู้
+            </button>
+          ) : loanSummary.remainingCredit <= 0 ? (
+            <button
+              disabled
+              title="คุณใช้สิทธิ์กู้ยืมเต็มวงเงินของรอบนี้แล้ว"
+              className="px-3.5 py-2 bg-slate-200 text-slate-500 text-xs font-bold rounded-xl shrink-0 cursor-not-allowed border border-slate-300"
+            >
+              🚫 เต็มวงเงินสิทธิ์
             </button>
           ) : (
             <Link
               href="/employee/loans/create"
               className="px-3.5 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer shrink-0"
             >
-              + ยื่นเรื่องคำขอ
+              + ยื่นเรื่องกู้ยืม
             </Link>
           )}
         </div>
 
-        {/* แจ้งเตือนสเตตัสกรณีมีคำร้องค้างอยู่ */}
-        {hasActiveLoan && (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-amber-900 text-xs flex items-start gap-2 shadow-sm animate-fadeIn">
-            <span className="text-base shrink-0">⏳</span>
-            <div className="space-y-0.5">
-              <p className="font-bold">มีคำร้องดำเนินการอยู่ในระบบ</p>
-              <p className="text-[11px] text-amber-800 leading-tight">
-                {activeLoanMsg}
-              </p>
+        {/* แจ้งเตือนเรื่องการคิดดอกเบี้ยและสรุปยอดหัก */}
+        {loanSummary.totalBorrowedThisMonth >= 4000 && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-amber-900 text-xs space-y-1.5 shadow-sm">
+            <div className="flex items-center gap-1.5 font-bold text-amber-900">
+              <span className="text-base">⚠️</span>
+              <span>แจ้งเตือนคำนวณดอกเบี้ยกู้ยืม (คิดดอกเบี้ย 5%)</span>
+            </div>
+            <p className="text-[11px] text-amber-800 leading-relaxed">
+              ยอดกู้สะสมในเดือนนี้รวม <strong>฿{loanSummary.totalBorrowedThisMonth.toLocaleString()}</strong> (เข้าเกณฑ์ตั้งแต่ 4,000 บาทขึ้นไป)
+            </p>
+            <div className="p-2 bg-amber-100/70 rounded-xl space-y-1 text-[11px] font-mono border border-amber-200/80">
+              <div className="flex justify-between">
+                <span className="text-amber-800">เงินต้นกู้สะสม:</span>
+                <span className="font-bold">฿{loanSummary.totalBorrowedThisMonth.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-red-600">
+                <span>ดอกเบี้ย 5%:</span>
+                <span className="font-bold">+฿{totalInterestAmount.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between border-t border-amber-300/60 pt-1 font-bold text-amber-950 text-xs">
+                <span>หักคืนวันเงินออก (10):</span>
+                <span>฿{totalDeductionWithInterest.toLocaleString()}</span>
+              </div>
             </div>
           </div>
         )}
@@ -203,74 +290,96 @@ export default function EmployeeLoansPage() {
           ) : filteredLoans.length === 0 ? (
             <div className="text-center text-slate-400 py-8 text-xs bg-slate-50 rounded-xl border border-slate-100 space-y-1">
               <span className="text-lg block">💳</span>
-              <span>{(fromDate || toDate) ? "ไม่พบรายการในช่วงวันที่เลือก" : "ยังไม่มีประวัติการยื่นขอเบิกเงินหรือกู้เงิน"}</span>
+              <span>{(fromDate || toDate) ? "ไม่พบรายการในช่วงวันที่เลือก" : "ยังไม่มีประวัติการยื่นขอกู้ยืมเงิน"}</span>
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredLoans.map((item) => (
-                <div key={item.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs shadow-sm">
-                  
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 text-lg font-mono">
-                          ฿{Number(item.amount).toLocaleString()}
-                        </span>
-                        <span className={`px-2 py-0.5 font-bold text-[10px] rounded-md ${
-                          item.type === "ADVANCE" 
-                            ? "bg-purple-100 text-purple-700 border border-purple-200" 
-                            : "bg-blue-100 text-blue-700 border border-blue-200"
-                        }`}>
-                          {item.type === "ADVANCE" ? "เบิกค่าจ้างล่วงหน้า" : "เงินกู้สวัสดิการ"}
-                        </span>
+              {filteredLoans.map((item) => {
+                const amount = Number(item.amount) || 0;
+                // คำนวณดอกเบี้ยรายรายการหากยอดรวมสะสมในเดือนนั้นเกิน/เท่ากับ 4000
+                const isOverInterestThreshold = loanSummary.totalBorrowedThisMonth >= 4000;
+                const interestAmount = isOverInterestThreshold ? amount * 0.05 : 0;
+                const totalDeduction = amount + interestAmount;
+                const createdAt = item.created_at || item.createdAt;
+
+                return (
+                  <div key={item.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs shadow-sm">
+                    
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 text-lg font-mono">
+                            ฿{amount.toLocaleString()}
+                          </span>
+                          <span className="px-2 py-0.5 font-bold text-[10px] rounded-md bg-blue-100 text-blue-700 border border-blue-200">
+                            เงินกู้สวัสดิการ
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0">
+                        {item.status === "PENDING" && (
+                          <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full font-bold text-[10px]">
+                            ⏳ รออนุมัติ
+                          </span>
+                        )}
+                        {item.status === "APPROVED" && (
+                          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px]">
+                            ✓ อนุมัติแล้ว
+                          </span>
+                        )}
+                        {item.status === "REJECTED" && (
+                          <span className="px-2.5 py-1 bg-red-50 text-red-600 border border-red-200 rounded-full font-bold text-[10px]">
+                            ✕ ไม่อนุมัติ
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    <div className="shrink-0">
-                      {item.status === "PENDING" && (
-                        <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full font-bold text-[10px]">
-                          ⏳ รออนุมัติ
+                    <div className="p-2.5 bg-white rounded-xl border border-slate-200/80 space-y-1.5 text-[11px] text-slate-600">
+                      <div className="flex justify-between text-slate-500 text-[10px] border-b pb-1">
+                        <span>เงื่อนไขชำระ:</span>
+                        <span className="font-bold text-slate-700">
+                          {isOverInterestThreshold 
+                            ? "หักคืนวันเงินออก (วันที่ 10) + ดอกเบี้ย 5%"
+                            : "หักคืนวันเงินออก (วันที่ 10) แบบไม่มีดอกเบี้ย"
+                          }
                         </span>
-                      )}
-                      {item.status === "APPROVED" && (
-                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px]">
-                          ✓ อนุมัติแล้ว
-                        </span>
-                      )}
-                      {item.status === "REJECTED" && (
-                        <span className="px-2.5 py-1 bg-red-50 text-red-600 border border-red-200 rounded-full font-bold text-[10px]">
-                          ✕ ไม่อนุมัติ
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 bg-white rounded-xl border border-slate-200/80 space-y-1 text-[11px] text-slate-600">
-                    <div className="flex justify-between text-slate-500 text-[10px]">
-                      <span>เงื่อนไขชำระ:</span>
-                      <span className="font-bold text-slate-700">
-                        {item.type === "ADVANCE" 
-                          ? "หักคืนในรอบจ่ายค่าจ้างถัดไป (ดบ. 0% + ค่าธรรมเนียม 20 บาท)"
-                          : `ผ่อนชำระ ${item.installments} งวด (ดอกเบี้ย 15%/ปี)`
-                        }
-                      </span>
-                    </div>
-
-                    {item.reason && (
-                      <div className="pt-1 border-t border-slate-100">
-                        <span className="text-slate-400">เหตุผล: </span>
-                        <span className="font-medium text-slate-800">"{item.reason}"</span>
                       </div>
-                    )}
-                  </div>
 
-                  <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono pt-0.5">
-                    <span>เลขที่รายการ: {item.id}</span>
-                    <span>🗓️ {item.date} {item.time} น.</span>
-                  </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span>ยอดกู้ต้นเงิน:</span>
+                        <span className="font-mono font-semibold text-slate-800">฿{amount.toLocaleString()}</span>
+                      </div>
 
-                </div>
-              ))}
+                      {isOverInterestThreshold && (
+                        <div className="flex justify-between text-[11px] text-red-600">
+                          <span>ดอกเบี้ย 5%:</span>
+                          <span className="font-mono font-semibold">+฿{interestAmount.toLocaleString()}</span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between text-[11px] font-bold text-slate-900 pt-1 border-t border-slate-100">
+                        <span>ยอดรวมหักคืนวันเงินออก:</span>
+                        <span className="font-mono text-orange-600">฿{totalDeduction.toLocaleString()}</span>
+                      </div>
+
+                      {item.reason && (
+                        <div className="pt-1 border-t border-slate-100 text-[10px]">
+                          <span className="text-slate-400">เหตุผล: </span>
+                          <span className="font-medium text-slate-800">"{item.reason}"</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono pt-0.5">
+                      <span className="truncate max-w-[150px]">ID: {item.id}</span>
+                      <span>🗓️ {createdAt ? new Date(createdAt).toLocaleDateString('th-TH') : '-'}</span>
+                    </div>
+
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

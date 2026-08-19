@@ -52,23 +52,23 @@ model Site {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  employeeCode  String?   @unique @map("employee_code")
-  name          String
-  age           Int?
-  gender        Gender?
-  role          Role      @default(EMPLOYEE)
-  phone         String?
-  email         String?   @unique
-  lineId        String?   @unique @map("line_id")
-  avatarUrl     String?   @map("avatar_url")
-  username      String    @unique
-  passwordHash  String    @map("password_hash")
+  id             String    @id @default(cuid())
+  employeeCode   String?   @unique @map("employee_code")
+  name           String
+  age            Int?
+  gender         Gender?
+  role           Role      @default(EMPLOYEE)
+  phone          String?
+  email          String?   @unique
+  lineId         String?   @unique @map("line_id")
+  avatarUrl      String?   @map("avatar_url")
+  username       String    @unique
+  passwordHash   String    @map("password_hash")
   
   // ข้อมูลส่วนตัว & เอกสาร
-  idCardNumber  String?   @unique @map("id_card_number")
-  address       String?
-  dateOfBirth   DateTime? @map("date_of_birth")
+  idCardNumber   String?   @unique @map("id_card_number")
+  address        String?
+  dateOfBirth    DateTime? @map("date_of_birth")
   
   // ข้อมูลเฉพาะ รปภ. / เอกสารสำคัญ
   thop7LicenseNo String?   @map("thop7_license_no") // ใบอนุญาต ธภ.7
@@ -88,6 +88,9 @@ model User {
   leaveRequests  LeaveRequest[]
   attendances    Attendance[]
   incidentReports IncidentReport[]
+  logbooks Logbook[]
+  equipmentRequests EquipmentRequest[]
+  randomChecks RandomCheck[]
 
   @@index([siteId])
   @@index([role])
@@ -99,12 +102,17 @@ model LeaveRequest {
   userId       String      @map("user_id")
   leaveType    LeaveType   @map("leave_type")
   startDate    DateTime    @map("start_date") @db.Date
+  endDate      DateTime?   @map("end_date") @db.Date
   durationDays Int         @map("duration_days")
   reason       String      @db.Text
+  rejectReason String?     @map("reject_reason")
   documentUrl  String?     @map("document_url")
+  hasEdited    Boolean     @default(false) @map("has_edited")
   status       LeaveStatus @default(PENDING)
+  
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
+  
   user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, startDate])
@@ -149,28 +157,88 @@ model ContactInquiry {
 }
 
 model Attendance {
-  id          String   @id @default(cuid())
-  userId      String
-  type        String   // "CHECK_IN" หรือ "CHECK_OUT"
-  latitude    Float
-  longitude   Float
-  images      String[] // เพิ่มบรรทัดนี้เพื่อเก็บลิสต์รายชื่อไฟล์รูปภาพ
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // "CHECK_IN" หรือ "CHECK_OUT"
+  latitude  Float
+  longitude Float
+  images    String[] // เก็บลิสต์รายชื่อไฟล์รูปภาพ
+  createdAt DateTime @default(now())
   
-  user        User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model IncidentReport {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  message   String   @db.Text
+  images    String[] 
+  latitude  Float?   
+  longitude Float?   
+  status    String   @default("PENDING") // <--- เพิ่มบรรทัดนี้เข้าไป
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("incident_reports")
+}
+
+model Logbook {
   id          String   @id @default(cuid())
   userId      String   @map("user_id")
-  message     String   @db.Text 
-  latitude    Float?
-  longitude   Float?
-  images      String[] // <--- เพิ่มบรรทัดนี้เพื่อเก็บลิสต์รายชื่อไฟล์รูปภาพ
+  message     String   @db.Text
+  images      String[] // เก็บอาเรย์ของลิงก์รูปภาพ
+  latitude    Float?   
+  longitude   Float?   
+  siteId      String?  @map("site_id")
+  status      String   @default("PENDING") // PENDING (รอตรวจสอบ), ACKNOWLEDGED (รับทราบแล้ว)
   createdAt   DateTime @default(now()) @map("created_at")
-  
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, createdAt])
-  @@map("incident_reports")
+  @@index([userId])
+  @@index([status])
+  @@map("logbooks")
+}
+
+model EquipmentRequest {
+  id              String      @id @default(cuid())
+  userId          String      @map("user_id")
+  equipmentType   String?     @map("equipment_type")
+  quantity        Int?
+  reason          String?     @db.Text
+  status          String      @default("PENDING") // ✅ เปลี่ยนเป็น String ตรงนี้
+  itemName        String?     @map("item_name")
+  reasonType      String?     @map("reason_type")
+  size            String?
+  hasEdited       Boolean     @default(false) @map("has_edited")
+  rejectReason    String?     @map("reject_reason")
+
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("equipment_requests")
+}
+
+model RandomCheck {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  siteName  String   @map("site_name")
+  details   String   @db.Text
+  latitude  Float
+  longitude Float
+  images    String[] @default([])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("random_checks")
 }

@@ -35,13 +35,13 @@ export default function LoginPage() {
         // 1. แปลง Role เป็นตัวพิมพ์ใหญ่เพื่อความชัวร์
         const userRole = data.user?.role?.toUpperCase();
 
-        // 2. แยกเส้นทางตาม Role ให้ถูกต้อง
-        if (userRole === "SUPERVISOR") {
-          window.location.href = "/supervisor/dashboard"; // หัวหน้างานวิ่งมาหน้านี้
-        } else if (["SUPER_ADMIN", "CEO", "HR", "FINANCE", "WAREHOUSE"].includes(userRole)) {
-          window.location.href = "/admin/admin-users"; // แอดมินและฝ่ายบริหารวิ่งไปหน้าจัดการ
+        // 2. แยกเส้นทางตาม Role หลักของระบบ (ตัด /admin ออกทั้งหมด)
+        if (userRole === "CEO") {
+          window.location.href = "/ceo/dashboard";
+        } else if (userRole === "SUPERVISOR") {
+          window.location.href = "/supervisor/dashboard";
         } else {
-          window.location.href = "/employee/profile"; // พนักงานทั่วไป
+          window.location.href = "/employee/profile";
         }
       } else {
         setError(data.error || "เข้าสู่ระบบไม่สำเร็จ");
@@ -55,7 +55,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="grid min-h-screen place-items-center bg-slate-900 p-5">
+    <main className="grid min-h-screen place-items-center bg-slate-900 p-5 font-sans">
       <section className="w-full max-w-md rounded-2xl bg-white p-7 shadow-2xl border border-slate-100">
         <a href="/" className="text-sm font-bold text-orange-500 hover:underline">
           ← กลับหน้าเว็บไซต์
@@ -79,7 +79,7 @@ export default function LoginPage() {
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="administrator หรือ รหัสพนักงาน"
+              placeholder="Username หรือ รหัสพนักงาน"
               className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-sm"
             />
           </label>
