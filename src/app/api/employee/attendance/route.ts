@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { uploadAttendanceImage } from "@/lib/supabaseStorage"; // นำเข้าฟังก์ชันที่เราสร้างขึ้น
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -45,8 +44,8 @@ export async function GET(req: Request) {
           checkOut: "-",
           locationIn: latLngStr,
           locationOut: "-",
-          imagesIn: item.images || [], // <--- เปลี่ยนจาก images เป็น imagesIn
-          imagesOut: [],              // <--- เพิ่ม imagesOut เป็น array ว่าง
+          imagesIn: item.images || [], 
+          imagesOut: [],              
           status: "ปกติ",
         });
       } else if (item.type === "CHECK_OUT") {
@@ -54,7 +53,7 @@ export async function GET(req: Request) {
         if (activeShift) {
           activeShift.checkOut = timeStr;
           activeShift.locationOut = latLngStr;
-          activeShift.imagesOut = item.images || []; // <--- เก็บรูปที่นี่
+          activeShift.imagesOut = item.images || []; 
         } else if (dayList.length > 0) {
           dayList[dayList.length - 1].checkOut = timeStr;
           dayList[dayList.length - 1].locationOut = latLngStr;
@@ -76,7 +75,7 @@ export async function GET(req: Request) {
   }
 }
 
-// 2. บันทึกเช็คอิน / เช็คเอาท์ พร้อมพิกัดและอัปโหลดรูปภาพ (POST)
+// 2. บันทึกเช็คอิน / เช็คเอาท์ พร้อมพิกัดและอัปโหลดรูปภาพขึ้น Supabase Storage (POST)
 export async function POST(req: Request) {
   try {
     const session = await getSession();
@@ -120,31 +119,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "คุณยังไม่ได้เช็คอินเข้างาน ไม่สามารถเช็คเอาท์ได้" }, { status: 400 });
     }
 
-    // จัดการอัปโหลดไฟล์รูปภาพเก็บไว้ในโฟลเดอร์ public/uploads/attendance
+    // เปลี่ยนมาใช้วิธีอัปโหลดรูปภาพขึ้น Supabase Storage แทนการใช้ fs
     const imageUrls: string[] = [];
-    const uploadDir = path.join(process.cwd(), "public", "uploads", "attendance");
-    
-    try {
-      await mkdir(uploadDir, { recursive: true });
-    } catch (e) {
-      // ignore if exists
-    }
 
     for (const file of imageFiles) {
       if (file && typeof file.arrayBuffer === "function") {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
         
-        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-        const filename = `${session.userId}-${uniqueSuffix}${path.extname(file.name || ".jpg")}`;
-        const filepath = path.join(uploadDir, filename);
-
-        await writeFile(filepath, buffer);
-        imageUrls.push(`/uploads/attendance/${filename}`);
+        // เรียกใช้ฟังก์ชันอัปโหลดที่เราทำไว้ใน src/lib/supabaseStorage.ts
+        const publicUrl = await uploadAttendanceImage(buffer, file.name || "attendance.jpg");
+        imageUrls.push(publicUrl);
       }
     }
 
-    // บันทึกลงฐานข้อมูล
+    // บันทึกลงฐานข้อมูล (เก็บเป็น Public URL)
     const newAttendance = await prisma.attendance.create({
       data: {
         userId: session.userId,
