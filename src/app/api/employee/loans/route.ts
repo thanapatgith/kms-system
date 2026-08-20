@@ -11,49 +11,44 @@ export async function GET() {
       return NextResponse.json({ error: "ยังไม่ได้เข้าสู่ระบบ" }, { status: 401 });
     }
 
-    const today = new Date();
-    const currentDate = today.getDate(); // วันที่ปัจจุบัน (1-31)
-    const dailyWage = 520; // ค่าจ้างพื้นฐานต่อวัน (รวม OT)
+    // 1. ดึง employee_code จากตาราง users ก่อน
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("employee_code")
+      .eq("id", session.userId)
+      .single();
 
-    // กำหนดรอบและช่วงเวลายื่นกู้:
-    // - รอบวันที่ 20: เปิดยื่นวันที่ 11-17 (สิทธิ์ทำงาน 10 วัน)
-    // - รอบวันที่ 30: เปิดยื่นวันที่ 18-27 (สิทธิ์ทำงาน 20 วัน)
-    let targetRound: 20 | 30 = 20;
-    let workedDays = 10;
-    let isWindowOpen = false;
+    // 2. ดึงข้อมูลเงินเดือนจากตาราง payrolls ของพนักงานคนนั้นในเดือน ก.ค. 69 (รวม gross_income และ net_salary)
+    const { data: payroll } = await supabase
+      .from("payrolls")
+      .select("daily_wage, work_days, gross_income, net_salary, total_deductions")
+      .eq("employee_code", userProfile?.employee_code?.trim())
+      .eq("billing_period", "2026-07")
+      .maybeSingle();
 
-    if (currentDate <= 17) {
-      targetRound = 20;
-      workedDays = 10;
-      isWindowOpen = currentDate >= 11 && currentDate <= 17;
-    } else {
-      targetRound = 30;
-      workedDays = 20;
-      isWindowOpen = currentDate >= 18 && currentDate <= 27; // 👈 ปรับเป็น 18 - 27
-    }
+    const dailyWage = payroll?.daily_wage || 520;
+    const workedDays = payroll?.work_days || 0;
+    
+    // ดึงค่าจริงจากตาราง payrolls (ช่อง รวมเงินที่ได้รับ และ เงินเดือนคงเหลือ)
+    const grossIncome = Number(payroll?.gross_income) || (dailyWage * workedDays);
+    const netSalary = Number(payroll?.net_salary) || grossIncome;
+    const totalDeductions = Number(payroll?.total_deductions) || 0;
 
-    // ดึงประวัติการกู้ในเดือนปัจจุบันจากตาราง loan_requests
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
-    const { data: monthLoans, error: fetchErr } = await supabase
+    // 3. ดึงประวัติการกู้และคำนวณยอดสะสม
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+    const { data: monthLoans } = await supabase
       .from("loan_requests")
       .select("*")
       .eq("user_id", session.userId)
       .gte("created_at", startOfMonth)
       .neq("status", "REJECTED");
 
-    if (fetchErr) {
-      console.error("Fetch loans error:", fetchErr);
-    }
-
-    // ยอดกู้สะสมในเดือนนี้
     const totalBorrowedThisMonth = (monthLoans || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
-    // คำนวณสิทธิ์สูงสุด (85% ของค่าจ้าง)
-    const totalEarned = dailyWage * workedDays;
-    const maxCredit = Math.floor(totalEarned * 0.85); // รอบ 20 = 4,420 บาท / รอบ 30 = 8,840 บาท
+    // 4. คำนวณสิทธิ์ (ใช้ 85% ของรายได้รวมจริง)
+    const maxCredit = Math.floor(grossIncome * 0.85);
     const remainingCredit = Math.max(0, maxCredit - totalBorrowedThisMonth);
 
-    // ดึงประวัติรายการทั้งหมดของพนักงาน
     const { data: allLoans } = await supabase
       .from("loan_requests")
       .select("*")
@@ -62,10 +57,11 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      targetRound,
-      isWindowOpen,
       workedDays,
       dailyWage,
+      grossIncome,        // รายได้รวมจริง (เช่น 17,566)
+      netSalary,          // เงินเดือนคงเหลือสุทธิจริง (เช่น 11,976.72)
+      totalDeductions,    // ยอดรวมหักจริง
       maxCredit,
       totalBorrowedThisMonth,
       remainingCredit,
@@ -75,89 +71,5 @@ export async function GET() {
   } catch (error: any) {
     console.error("Get loan error:", error);
     return NextResponse.json({ error: "เกิดข้อผิดพลาดในการดึงข้อมูล" }, { status: 500 });
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const session = await getSession();
-    if (!session || !session.userId) {
-      return NextResponse.json({ error: "ยังไม่ได้เข้าสู่ระบบ" }, { status: 401 });
-    }
-
-    const { amount, reason } = await request.json();
-    const loanAmount = Number(amount);
-
-    if (!loanAmount || loanAmount <= 0) {
-      return NextResponse.json({ error: "กรุณาระบุจำนวนเงินให้ถูกต้อง" }, { status: 400 });
-    }
-
-    const today = new Date();
-    const currentDate = today.getDate();
-    const dailyWage = 520;
-
-    let workedDays = 0;
-    if (currentDate >= 11 && currentDate <= 17) {
-      workedDays = 10;
-    } else if (currentDate >= 18 && currentDate <= 27) { // 👈 ปรับเป็น 18 - 27
-      workedDays = 20;
-    } else {
-      return NextResponse.json({ error: "ไม่อยู่ในช่วงเวลาที่เปิดให้ยื่นกู้ (เปิดรอบวันที่ 20 ช่วง 11-17 และ รอบวันที่ 30 ช่วง 18-27)" }, { status: 400 });
-    }
-
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
-    const { data: monthLoans } = await supabase
-      .from("loan_requests")
-      .select("*")
-      .eq("user_id", session.userId)
-      .gte("created_at", startOfMonth)
-      .neq("status", "REJECTED");
-
-    const totalBorrowedThisMonth = (monthLoans || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-    const maxCredit = Math.floor(dailyWage * workedDays * 0.85);
-    const remainingCredit = Math.max(0, maxCredit - totalBorrowedThisMonth);
-
-    if (loanAmount > remainingCredit) {
-      return NextResponse.json({ 
-        error: `จำนวนเงินกู้เกินสิทธิ์คงเหลือที่กู้ได้ (กู้ได้สูงสุดอีก ฿${remainingCredit.toLocaleString()} บาท)` 
-      }, { status: 400 });
-    }
-
-    const newTotalBorrowed = totalBorrowedThisMonth + loanAmount;
-    let interestRate = 0;
-    if (newTotalBorrowed > 4000) {
-      interestRate = 0.05;
-    }
-
-    const { data: newLoan, error: insertError } = await supabase
-      .from("loan_requests")
-      .insert([
-        {
-          user_id: session.userId,
-          amount: loanAmount,
-          reason: reason || "เบิกเงินล่วงหน้า",
-          status: "PENDING",
-          interest_rate: interestRate,
-          created_at: new Date().toISOString(),
-        }
-      ])
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error("Insert loan error:", insertError);
-      return NextResponse.json({ error: "ไม่สามารถยื่นเรื่องกู้ยืมได้" }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: "ยื่นคำร้องกู้ยืมเงินสำเร็จ",
-      loan: newLoan,
-      warningInterest: newTotalBorrowed >= 4000
-    }, { status: 200 });
-
-  } catch (error: any) {
-    console.error("Submit loan error:", error);
-    return NextResponse.json({ error: "เกิดข้อผิดพลาดในการประมวลผล" }, { status: 500 });
   }
 }

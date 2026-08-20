@@ -11,7 +11,10 @@ export default function SupervisorDashboardPage() {
     remainingCredit: 9340,
     usedCredit: 0,
     totalCredit: 9340,
-    workedDays: 20
+    workedDays: 31,
+    grossEarnings: 49999.9,
+    netSalary: 48399.9,
+    totalDeductions: 1599.997
   });
   const [loading, setLoading] = useState(true);
   const [leavesCount] = useState(4);
@@ -54,15 +57,12 @@ export default function SupervisorDashboardPage() {
     }
   };
 
+  // ดึงค่าจริงจาก API พร้อมปัดเศษทศนิยมให้เป็นจำนวนเต็ม
   const dailyWage = profile?.dailyRate || 520;
-  const workedDays = stats.workedDays || 20;
-  const grossEarnings = workedDays * dailyWage;
-  
-  // ใช้ยอดเงินกู้ที่ดึงมาจาก API แดชบอร์ดจริง
-  const totalBorrowed = stats.usedCredit || 0;
-  const interestAmount = totalBorrowed >= 4000 ? totalBorrowed * 0.05 : 0;
-  const totalDeduction = totalBorrowed + interestAmount;
-  const netSalaryPayable = grossEarnings - totalDeduction;
+  const workedDays = stats.workedDays || 31;
+  const grossEarnings = Math.round(stats.grossEarnings ?? (workedDays * dailyWage));
+  const totalDeduction = Math.round(stats.totalDeductions ?? 0);
+  const netSalaryPayable = Math.round(stats.netSalary ?? (grossEarnings - totalDeduction));
 
   const unreadCount = notifications.length;
 
@@ -110,7 +110,7 @@ export default function SupervisorDashboardPage() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[11px] text-slate-400 font-medium">
-                ยินดีต้อนรับ, <strong className="text-white">{profile?.name || "ผู้ควบคุมงาน"}</strong>
+                ยินดีต้อนรับ, <strong className="text-white">{profile?.name || stats.employeeName || "ผู้ควบคุมงาน"}</strong>
               </p>
               <p className="text-[10px] text-amber-400 font-semibold">
                 📍 {profile?.branch || profile?.site?.siteName || "หน่วยงานสังกัด KMS"}
@@ -141,7 +141,7 @@ export default function SupervisorDashboardPage() {
                 <span className="font-bold text-slate-200">฿{grossEarnings.toLocaleString()}</span>
               </div>
               <div className="bg-slate-900/50 p-1.5 rounded-xl">
-                <span className="block text-[9px] font-sans text-slate-400">หักกู้ยืม+ดอก</span>
+                <span className="block text-[9px] font-sans text-slate-400">รวมหัก (ภาษี/อื่นๆ)</span>
                 <span className="font-bold text-red-400">
                   {totalDeduction > 0 ? `-฿${totalDeduction.toLocaleString()}` : "-"}
                 </span>

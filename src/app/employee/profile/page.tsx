@@ -9,12 +9,14 @@ export default function EmployeeProfilePage() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // แก้ไขตรงนี้: เปลี่ยนค่าเริ่มต้นจาก 4000 เป็น 0 เพื่อให้พนักงานใหม่เริ่มต้นด้วยข้อมูลจริง
   const [loanSummary, setLoanSummary] = useState({
     workedDays: 0,
     dailyWage: 520,
+    grossIncome: 0,
+    netSalary: 0,
+    totalDeductions: 0,
     totalBorrowedThisMonth: 0,
-    remainingCredit: 10000, // หรือวงเงินเครดิตตั้งต้น
+    remainingCredit: 10000,
   });
   const [leavesCount, setLeavesCount] = useState(0);
 
@@ -40,6 +42,9 @@ export default function EmployeeProfilePage() {
         setLoanSummary({
           workedDays: dataLoan.workedDays || 0,
           dailyWage: dataLoan.dailyWage || 520,
+          grossIncome: dataLoan.grossIncome || 0,
+          netSalary: dataLoan.netSalary || 0,
+          totalDeductions: dataLoan.totalDeductions || 0,
           totalBorrowedThisMonth: dataLoan.totalBorrowedThisMonth || 0,
           remainingCredit: dataLoan.remainingCredit || 10000,
         });
@@ -51,13 +56,12 @@ export default function EmployeeProfilePage() {
     }
   };
 
-  const dailyWage = loanSummary.dailyWage || 520;
+  // ปัดเศษตัวเลขทั้งหมดให้เป็นจำนวนเต็มด้วย Math.round()
+  const dailyWage = Math.round(loanSummary.dailyWage || 520);
   const workedDays = loanSummary.workedDays || 0;
-  const grossEarnings = workedDays * dailyWage;
-  const totalBorrowed = loanSummary.totalBorrowedThisMonth || 0;
-  const interestAmount = totalBorrowed > 0 ? totalBorrowed * 0.05 : 0;
-  const totalDeduction = totalBorrowed + interestAmount;
-  const netSalaryPayable = grossEarnings - totalDeduction;
+  const grossEarnings = Math.round(loanSummary.grossIncome || (workedDays * dailyWage));
+  const netSalaryPayable = Math.round(loanSummary.netSalary || grossEarnings);
+  const totalDeduction = Math.round(loanSummary.totalDeductions || 0);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -70,7 +74,7 @@ export default function EmployeeProfilePage() {
             <span className="px-2 py-0.5 bg-orange-500 font-bold text-[10px] rounded uppercase tracking-wider">
               KMS
             </span>
-            <h1 className="text-sm font-bold">หน้าแรกสวัสดิการ</h1>
+            <h1 className="text-sm font-bold">หน้าแรก</h1>
           </div>
 
           <div className="flex items-center gap-2">
@@ -136,7 +140,7 @@ export default function EmployeeProfilePage() {
                 <span className="font-bold text-slate-200">฿{grossEarnings.toLocaleString()}</span>
               </div>
               <div className="bg-slate-900/50 p-1.5 rounded-xl">
-                <span className="block text-[9px] font-sans text-slate-400">หักกู้ยืม+ดอก</span>
+                <span className="block text-[9px] font-sans text-slate-400">ยอดรวมหัก</span>
                 <span className="font-bold text-red-400">-฿{totalDeduction.toLocaleString()}</span>
               </div>
             </div>

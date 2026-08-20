@@ -15,15 +15,9 @@ export default function CreateReportPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // State สำหรับหน่วยงาน
-  const [selectedBranch, setSelectedBranch] = useState("หน่วยงาน A (จุดประจำ)");
-  const [branchesList, setBranchesList] = useState<string[]>([
-    "หน่วยงาน A (จุดประจำ)",
-    "หน่วยงาน B (โซนอาคารสำนักงาน)",
-    "หน่วยงาน C (คลังสินค้า)",
-    "หน่วยงาน D (ประตูทางเข้าหลัก)",
-  ]);
+  const [selectedBranch, setSelectedBranch] = useState("");
+  const [branchesList, setBranchesList] = useState<string[]>([]);
 
-  // ดึงพิกัด GPS และโปรไฟล์เพื่อดึงหน่วยงานประจำ
   useEffect(() => {
     fetchUserProfile();
 
@@ -48,10 +42,17 @@ export default function CreateReportPage() {
       const res = await fetch("/api/employee/profile");
       const data = await res.json();
       if (data.ok && data.user?.branch) {
-        setSelectedBranch(data.user.branch);
+        const userBranch = data.user.branch;
+        setSelectedBranch(userBranch);
+        setBranchesList([userBranch]);
+      } else {
+        setBranchesList(["หน่วยงานทั่วไป"]);
+        setSelectedBranch("หน่วยงานทั่วไป");
       }
     } catch (err) {
       console.error(err);
+      setBranchesList(["หน่วยงานทั่วไป"]);
+      setSelectedBranch("หน่วยงานทั่วไป");
     }
   };
 
@@ -74,11 +75,7 @@ export default function CreateReportPage() {
   };
 
   const applyQuickText = (text: string) => {
-    if (message) {
-      setMessage(message + " " + text);
-    } else {
-      setMessage(text);
-    }
+    setMessage(message ? message + " " + text : text);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -91,7 +88,6 @@ export default function CreateReportPage() {
     }
 
     setLoading(true);
-
     try {
       const formData = new FormData();
       formData.append("message", message);
@@ -101,9 +97,7 @@ export default function CreateReportPage() {
         formData.append("latitude", location.lat.toString());
         formData.append("longitude", location.lng.toString());
       }
-      images.forEach((img) => {
-        formData.append("images", img);
-      });
+      images.forEach((img) => formData.append("images", img));
 
       const res = await fetch("/api/employee/reports", {
         method: "POST",
@@ -111,7 +105,6 @@ export default function CreateReportPage() {
       });
 
       const data = await res.json();
-
       if (!res.ok || (!data.ok && !data.success)) {
         throw new Error(data.error || "เกิดข้อผิดพลาดในการส่งรายงาน");
       }
@@ -122,11 +115,6 @@ export default function CreateReportPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleCloseSuccessModal = () => {
-    setShowSuccessModal(false);
-    router.push("/employee/reports");
   };
 
   return (
@@ -174,7 +162,7 @@ export default function CreateReportPage() {
             </select>
           </div>
 
-          {/* 1. ปุ่มถ่ายรูป / เลือกรูปภาพ */}
+          {/* 1. รูปภาพประกอบ */}
           <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 space-y-3">
             <label className="block text-xs font-bold text-slate-800">
               📸 รูปภาพประกอบการตรวจตรา *
@@ -282,7 +270,6 @@ export default function CreateReportPage() {
           </button>
 
         </form>
-
       </main>
 
       {/* Modal สรุปผลส่งรายงานสำเร็จ */}
@@ -299,7 +286,10 @@ export default function CreateReportPage() {
               </p>
             </div>
             <button
-              onClick={handleCloseSuccessModal}
+              onClick={() => {
+                setShowSuccessModal(false);
+                router.push("/employee/reports");
+              }}
               className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-2xl shadow-md shadow-orange-500/20 transition cursor-pointer"
             >
               ตกลง
