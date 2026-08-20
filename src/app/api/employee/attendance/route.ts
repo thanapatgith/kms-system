@@ -68,7 +68,11 @@ export async function GET(req: Request) {
     });
     allFormatted.reverse();
 
-    return NextResponse.json({ ok: true, attendance: allFormatted });
+    return NextResponse.json({ ok: true, attendance: allFormatted }, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      },
+    });
   } catch (error: any) {
     console.error("Get attendance error:", error);
     return NextResponse.json({ ok: false, error: error.message || "เกิดข้อผิดพลาด" }, { status: 500 });
@@ -119,7 +123,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "คุณยังไม่ได้เช็คอินเข้างาน ไม่สามารถเช็คเอาท์ได้" }, { status: 400 });
     }
 
-    // เปลี่ยนมาใช้วิธีอัปโหลดรูปภาพขึ้น Supabase Storage แทนการใช้ fs
+    // อัปโหลดรูปภาพขึ้น Supabase Storage
     const imageUrls: string[] = [];
 
     for (const file of imageFiles) {
@@ -127,7 +131,6 @@ export async function POST(req: Request) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
         
-        // เรียกใช้ฟังก์ชันอัปโหลดที่เราทำไว้ใน src/lib/supabaseStorage.ts
         const publicUrl = await uploadAttendanceImage(buffer, file.name || "attendance.jpg");
         imageUrls.push(publicUrl);
       }

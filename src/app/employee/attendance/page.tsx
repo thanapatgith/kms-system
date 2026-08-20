@@ -46,13 +46,14 @@ export default function EmployeeAttendancePage() {
     }
   };
 
-  const todayFormatted = new Date().toLocaleDateString("th-TH", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  // ใช้เทียบวันที่แบบสากล (YYYY-MM-DD) เพื่อตัดปัญหาเรื่อง Timezone และภาษาบน Vercel
+  const todayString = new Date().toISOString().split("T")[0];
   
-  const todayRecords = history.filter(item => item.date === todayFormatted);
+  const todayRecords = history.filter(item => {
+    if (!item.rawDate) return false;
+    const itemDateStr = new Date(item.rawDate).toISOString().split("T")[0];
+    return itemDateStr === todayString;
+  });
   
   // เช็คว่าปัจจุบันมีกะไหนที่ "ยังไม่ได้เช็คเอาท์" (กำลังทำงานอยู่) หรือไม่
   const activeRecord = todayRecords.find(item => item.checkIn && item.checkIn !== "-" && (!item.checkOut || item.checkOut === "-"));
