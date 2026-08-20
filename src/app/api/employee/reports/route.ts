@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { uploadReportImage } from "@/lib/supabaseStorage"; // ใช้วิธีอัปโหลดขึ้น Supabase Storage ที่แยก Bucket reports
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -36,14 +35,18 @@ export async function GET(req: Request) {
       images: item.images || [],
     }));
 
-    return NextResponse.json({ ok: true, reports: formatted });
+    return NextResponse.json({ ok: true, reports: formatted }, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      },
+    });
   } catch (error: any) {
     console.error("Get reports error:", error);
     return NextResponse.json({ ok: false, error: error.message || "เกิดข้อผิดพลาดในการดึงข้อมูลรายงาน" }, { status: 500 });
   }
 }
 
-// 2. สร้างและส่งรายงานเหตุการณ์ใหม่ พร้อมพิกัดและอัปโหลดรูปภาพ (POST)
+// 2. สร้างและส่งรายงานเหตุการณ์ใหม่ พร้อมพิกัดและอัปโหลดรูปภาพขึ้น Supabase (POST)
 export async function POST(req: Request) {
   try {
     const session = await getSession();
@@ -61,29 +64,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "กรุณากรอกข้อความรายงานเหตุการณ์/การตรวจตรา" }, { status: 400 });
     }
 
-    // จัดการอัปโหลดไฟล์รูปภาพเก็บไว้ในโฟลเดอร์ public/uploads/reports
+    // จัดการอัปโหลดไฟล์รูปภาพขึ้น Supabase Storage (Bucket: reports) แทนการใช้ fs
     const imageUrls: string[] = [];
     
     if (imageFiles && imageFiles.length > 0) {
-      const uploadDir = path.join(process.cwd(), "public", "uploads", "reports");
-      
-      try {
-        await mkdir(uploadDir, { recursive: true });
-      } catch (e) {
-        // ignore if exists
-      }
-
       for (const file of imageFiles) {
         if (file && typeof file.arrayBuffer === "function") {
           const bytes = await file.arrayBuffer();
           const buffer = Buffer.from(bytes);
           
-          const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-          const filename = `${session.userId}-${uniqueSuffix}${path.extname(file.name || ".jpg")}`;
-          const filepath = path.join(uploadDir, filename);
-
-          await writeFile(filepath, buffer);
-          imageUrls.push(`/uploads/reports/${filename}`);
+          const publicUrl = await uploadReportImage(buffer, file.name || "report.jpg");
+          imageUrls.push(publicUrl);
         }
       }
     }
