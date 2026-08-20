@@ -34,7 +34,9 @@ export default function EmployeeAttendancePage() {
 
   const fetchAttendance = async () => {
     try {
-      const res = await fetch("/api/employee/attendance");
+      const res = await fetch("/api/employee/attendance", {
+        cache: "no-store", // บังคับไม่ให้แคชข้อมูล ดึงใหม่สดๆ ทุกครั้ง
+      });
       const data = await res.json();
       if (data.ok) {
         setHistory(data.attendance || []);
