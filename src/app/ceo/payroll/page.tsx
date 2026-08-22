@@ -6,6 +6,7 @@ import Link from "next/link";
 interface PayrollItem {
   id: string;
   user_id?: string;
+  employee_code?: string;
   employee_name: string;
   gender: string;
   site_name: string;
@@ -172,8 +173,8 @@ export default function CEOPayrollPage() {
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] font-mono font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
-                          {item.user_id || `kms${(idx + 1).toString().padStart(3, "0")}`}
-                        </span>
+  {item.employee_code || "KMS-EMP"}
+</span>
                         <span className="text-xs font-bold text-slate-800">{item.employee_name}</span>
                       </div>
                       <span className="text-[10px] text-slate-400 block mt-0.5">

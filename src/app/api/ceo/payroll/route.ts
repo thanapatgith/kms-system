@@ -12,13 +12,23 @@ const supabaseAdmin = createClient(
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const period = searchParams.get("period") || "2026-08";
+    const period = searchParams.get("period") || "2026-07"; // เช่น "2026-07"
 
-    // ดึงข้อมูลจริงจาก Supabase
+    // แยกปีและเดือนจากค่าที่ส่งมา (เช่น "2026-07" -> year = "2026", month = "07" หรือ "7")
+    const [year, monthStr] = period.split("-");
+    const monthNum = monthStr ? parseInt(monthStr, 10).toString() : ""; // แปลง "07" เป็น "7" เพื่อรองรับรูปแบบ "1/7/2026"
+
+    // สร้างรูปแบบที่เป็นไปได้ทั้งหมดที่อาจจะถูกเก็บใน DB
+    const pattern1 = period;                 // เช่น "2026-07"
+    const pattern2 = `${monthNum}/${monthStr}/${year}`; // เช่น "7/07/2026" หรือแบบมีเลข 0
+    const pattern3 = `1/${monthNum}/${year}`;  // เช่น "1/7/2026"
+    const pattern4 = `${year}/${monthStr}`;    // เช่น "2026/07"
+
+    // ดึงข้อมูลโดยใช้เงื่อนไข .or() ให้ครอบคลุมทุกรูปแบบที่เป็นไปได้
     const { data, error } = await supabaseAdmin
       .from("payrolls")
       .select("*")
-      .eq("billing_period", period)
+      .or(`billing_period.eq.${pattern1},billing_period.eq.${pattern2},billing_period.eq.${pattern3},billing_period.eq.${pattern4}`)
       .order("created_at", { ascending: true });
 
     if (error) {
