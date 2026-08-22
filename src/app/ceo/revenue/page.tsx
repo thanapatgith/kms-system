@@ -17,7 +17,7 @@ interface RevenueItem {
   sites: {
     id: string;
     site_code: string;
-    name: string;
+    site_name: string;
   };
 }
 
@@ -30,7 +30,6 @@ export default function CEORevenuePage() {
   const [selectedItem, setSelectedItem] = useState<RevenueItem | null>(null);
   const [activeTab, setActiveTab] = useState<"SLIP" | "TAX" | "RECEIPT">("SLIP");
 
-  // ดึงข้อมูลจริงจาก API
   useEffect(() => {
     async function fetchRevenues() {
       setLoading(true);
@@ -49,21 +48,18 @@ export default function CEORevenuePage() {
     fetchRevenues();
   }, [selectedMonth]);
 
-  // คำนวณสรุปตัวเลข
   const totalAmount = revenues.reduce((acc, item) => acc + Number(item.amount), 0);
   const paidAmount = revenues.filter((i) => i.payment_status === "PAID").reduce((acc, item) => acc + Number(item.amount), 0);
   const pendingAmount = revenues.filter((i) => i.payment_status !== "PAID").reduce((acc, item) => acc + Number(item.amount), 0);
 
-  // กรองตามคำค้นหา และ สถานะ
   const filteredData = revenues.filter((item) => {
-    const matchesSearch = item.sites?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = item.sites?.site_name?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === "ALL" || item.payment_status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
   return (
     <div className="w-full min-h-screen bg-slate-100 pb-24 font-sans">
-      {/* Header */}
       <header className="bg-slate-900 text-white shadow-md sticky top-0 z-50">
         <div className="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-2">
@@ -85,9 +81,7 @@ export default function CEORevenuePage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-md mx-auto px-4 mt-4 space-y-4">
-        {/* การ์ดสรุปยอดเงินงวดเดือน */}
         <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-md space-y-3 border border-slate-800">
           <div className="flex justify-between items-center border-b border-slate-800 pb-2">
             <span className="text-xs text-slate-400 font-medium">รวมยอดค่าว่าจ้างประจำงวด (DB จริง)</span>
@@ -116,7 +110,6 @@ export default function CEORevenuePage() {
           </div>
         </div>
 
-        {/* ช่องค้นหา & ตัวกรองสถานะ */}
         <div className="space-y-2">
           <input
             type="text"
@@ -130,9 +123,7 @@ export default function CEORevenuePage() {
             <button
               onClick={() => setFilterStatus("ALL")}
               className={`px-3 py-1.5 rounded-xl border font-bold transition whitespace-nowrap cursor-pointer ${
-                filterStatus === "ALL"
-                  ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                filterStatus === "ALL" ? "bg-slate-900 text-white border-slate-900 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
               }`}
             >
               ทั้งหมด ({revenues.length})
@@ -140,9 +131,7 @@ export default function CEORevenuePage() {
             <button
               onClick={() => setFilterStatus("PAID")}
               className={`px-3 py-1.5 rounded-xl border font-bold transition whitespace-nowrap cursor-pointer ${
-                filterStatus === "PAID"
-                  ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                filterStatus === "PAID" ? "bg-emerald-600 text-white border-emerald-600 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
               }`}
             >
               ✅ ชำระแล้ว ({revenues.filter((i) => i.payment_status === "PAID").length})
@@ -150,9 +139,7 @@ export default function CEORevenuePage() {
             <button
               onClick={() => setFilterStatus("PENDING")}
               className={`px-3 py-1.5 rounded-xl border font-bold transition whitespace-nowrap cursor-pointer ${
-                filterStatus === "PENDING"
-                  ? "bg-amber-500 text-white border-amber-500 shadow-sm"
-                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                filterStatus === "PENDING" ? "bg-amber-500 text-white border-amber-500 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
               }`}
             >
               ⏳ รอการชำระ ({revenues.filter((i) => i.payment_status === "PENDING").length})
@@ -160,7 +147,6 @@ export default function CEORevenuePage() {
           </div>
         </div>
 
-        {/* รายการตารางสัญญาประจำงวด */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center text-xs font-bold text-slate-700">
             <span>รายการสัญญาประจำงวด ({filteredData.length})</span>
@@ -186,23 +172,17 @@ export default function CEORevenuePage() {
                         #{idx + 1}
                       </span>
                       <span className="text-xs font-bold text-slate-800 line-clamp-1">
-                        {item.sites?.name}
+                        {item.sites?.site_name}
                       </span>
                     </div>
                     {item.payment_status === "PAID" && (
-                      <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full whitespace-nowrap">
-                        ชำระแล้ว
-                      </span>
+                      <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full whitespace-nowrap">ชำระแล้ว</span>
                     )}
                     {item.payment_status === "PENDING" && (
-                      <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full whitespace-nowrap">
-                        รอชำระ
-                      </span>
+                      <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full whitespace-nowrap">รอชำระ</span>
                     )}
                     {item.payment_status === "OVERDUE" && (
-                      <span className="text-[9px] font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full whitespace-nowrap">
-                        เกินกำหนด
-                      </span>
+                      <span className="text-[9px] font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full whitespace-nowrap">เกินกำหนด</span>
                     )}
                   </div>
 
@@ -236,7 +216,6 @@ export default function CEORevenuePage() {
         </div>
       </main>
 
-      {/* Modal ตรวจสอบหลักฐาน */}
       {selectedItem && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -245,7 +224,7 @@ export default function CEORevenuePage() {
                 <span className="text-[10px] font-bold text-amber-600 uppercase">
                   ตรวจสอบหลักฐาน (งวด: {selectedItem.billing_period})
                 </span>
-                <h3 className="text-sm font-bold text-slate-900">{selectedItem.sites?.name}</h3>
+                <h3 className="text-sm font-bold text-slate-900">{selectedItem.sites?.site_name}</h3>
               </div>
               <button onClick={() => setSelectedItem(null)} className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1">
                 ✕
@@ -253,57 +232,36 @@ export default function CEORevenuePage() {
             </div>
 
             <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold text-slate-600">
-              <button
-                onClick={() => setActiveTab("SLIP")}
-                className={`flex-1 py-1.5 rounded-lg transition cursor-pointer ${activeTab === "SLIP" ? "bg-white text-slate-900 shadow-sm" : ""}`}
-              >
+              <button onClick={() => setActiveTab("SLIP")} className={`flex-1 py-1.5 rounded-lg transition cursor-pointer ${activeTab === "SLIP" ? "bg-white text-slate-900 shadow-sm" : ""}`}>
                 🧾 สลิปโอน
               </button>
-              <button
-                onClick={() => setActiveTab("TAX")}
-                className={`flex-1 py-1.5 rounded-lg transition cursor-pointer ${activeTab === "TAX" ? "bg-white text-slate-900 shadow-sm" : ""}`}
-              >
+              <button onClick={() => setActiveTab("TAX")} className={`flex-1 py-1.5 rounded-lg transition cursor-pointer ${activeTab === "TAX" ? "bg-white text-slate-900 shadow-sm" : ""}`}>
                 📄 50 ทวิ
               </button>
-              <button
-                onClick={() => setActiveTab("RECEIPT")}
-                className={`flex-1 py-1.5 rounded-lg transition cursor-pointer ${activeTab === "RECEIPT" ? "bg-white text-slate-900 shadow-sm" : ""}`}
-              >
+              <button onClick={() => setActiveTab("RECEIPT")} className={`flex-1 py-1.5 rounded-lg transition cursor-pointer ${activeTab === "RECEIPT" ? "bg-white text-slate-900 shadow-sm" : ""}`}>
                 🧾 ใบเสร็จ
               </button>
             </div>
 
             <div className="space-y-2">
               {activeTab === "SLIP" && (
-                selectedItem.slip_url ? (
-                  <img src={selectedItem.slip_url} alt="Slip" className="w-full h-56 object-cover rounded-xl border border-slate-200" />
-                ) : <p className="text-center py-10 text-slate-400 text-xs bg-slate-50 rounded-xl">ยังไม่ได้แนบสลิปโอนเงิน</p>
+                selectedItem.slip_url ? <img src={selectedItem.slip_url} alt="Slip" className="w-full h-56 object-cover rounded-xl border border-slate-200" /> : <p className="text-center py-10 text-slate-400 text-xs bg-slate-50 rounded-xl">ยังไม่ได้แนบสลิปโอนเงิน</p>
               )}
-
               {activeTab === "TAX" && (
-                selectedItem.tax_doc_url ? (
-                  <img src={selectedItem.tax_doc_url} alt="50 Tawi" className="w-full h-56 object-cover rounded-xl border border-slate-200" />
-                ) : <p className="text-center py-10 text-slate-400 text-xs bg-slate-50 rounded-xl">ยังไม่ได้แนบหนังสือ 50 ทวิ</p>
+                selectedItem.tax_doc_url ? <img src={selectedItem.tax_doc_url} alt="50 Tawi" className="w-full h-56 object-cover rounded-xl border border-slate-200" /> : <p className="text-center py-10 text-slate-400 text-xs bg-slate-50 rounded-xl">ยังไม่ได้แนบหนังสือ 50 ทวิ</p>
               )}
-
               {activeTab === "RECEIPT" && (
-                selectedItem.receipt_url ? (
-                  <img src={selectedItem.receipt_url} alt="Receipt" className="w-full h-56 object-cover rounded-xl border border-slate-200" />
-                ) : <p className="text-center py-10 text-slate-400 text-xs bg-slate-50 rounded-xl">ยังไม่ได้แนบใบเสร็จรับเงิน</p>
+                selectedItem.receipt_url ? <img src={selectedItem.receipt_url} alt="Receipt" className="w-full h-56 object-cover rounded-xl border border-slate-200" /> : <p className="text-center py-10 text-slate-400 text-xs bg-slate-50 rounded-xl">ยังไม่ได้แนบใบเสร็จรับเงิน</p>
               )}
             </div>
 
-            <button
-              onClick={() => setSelectedItem(null)}
-              className="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl hover:bg-slate-800 transition cursor-pointer"
-            >
+            <button onClick={() => setSelectedItem(null)} className="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl hover:bg-slate-800 transition cursor-pointer">
               ปิดหน้าต่าง
             </button>
           </div>
         </div>
       )}
 
-      {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-2 py-2 flex justify-around items-center z-50 shadow-lg max-w-md mx-auto">
         <Link href="/ceo/dashboard" className="flex flex-col items-center text-slate-400 hover:text-amber-400 text-[10px] font-semibold transition">
           <span className="text-base mb-0.5">📊</span>แดชบอร์ด

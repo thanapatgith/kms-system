@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
@@ -13,41 +12,26 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: "ไม่ได้เข้าสู่ระบบ" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.userId },
-      select: {
-        id: true,
-        name: true,
-        employeeCode: true,
-        role: true,
-        phone: true,
-        age: true,
-        address: true,
-        idCardNumber: true,
-        thop7LicenseNo: true,
-        pdpaConsent: true,
-        site: {
-          select: {
-            siteName: true,
-          },
-        },
-      },
-    });
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", session.userId)
+      .maybeSingle();
 
-    if (!user) {
+    if (error || !user) {
       return NextResponse.json({ ok: false, error: "ไม่พบข้อมูลผู้ใช้งาน" }, { status: 404 });
     }
 
-    // ดึงเรทค่าจ้างและ site_name จากตาราง payrolls ใน Supabase
     let dailyRate = 520;
-    let branchName = user.site?.siteName;
+    let branchName = user.branch || "หน่วยงานสังกัด KMS";
 
-    if (user.employeeCode) {
+    if (user.employee_code) {
+      // ค้นหาข้อมูลจากตาราง payrolls โดยรองรับทั้งรูปแบบ "2026-07" และ "1/7/2026"
       const { data: payrollData } = await supabase
         .from("payrolls")
-        .select("daily_wage, site_name")
-        .eq("billing_period", "2026-07")
-        .eq("employee_code", user.employeeCode.trim())
+        .select("daily_wage, site_name, net_salary, total_deductions")
+        .or(`billing_period.eq.2026-07,billing_period.eq.1/7/2026`)
+        .eq("employee_code", user.employee_code.trim())
         .maybeSingle();
 
       if (payrollData?.daily_wage) {
@@ -61,11 +45,13 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ok: true,
       user: {
-        ...user,
+        name: user.name || "-",
+        employeeCode: user.employee_code || user.employeeCode || "-",
+        phone: user.phone || "-",
+        idCard: user.id_card_number || user.idCardNumber || "-",
+        licenseNo: user.thop7_license_no || user.thop7LicenseNo || "ไม่มีข้อมูล",
+        branch: branchName,
         dailyRate: dailyRate,
-        branch: branchName || "ยังไม่ระบุหน่วยงาน",
-        idCard: user.idCardNumber || "-",
-        guardLicense: user.thop7LicenseNo || "ยังไม่มีข้อมูลเลขใบอนุญาต",
       },
     });
   } catch (error: any) {

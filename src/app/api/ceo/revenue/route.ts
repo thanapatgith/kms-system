@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "2026-07";
 
-    // ดึงข้อมูลรายรับพร้อม join ตาราง sites และ users (ผู้บันทึก)
+    // ดึงข้อมูลรายรับพร้อม join ตาราง sites ให้ตรงกับชื่อคอลัมน์จริง (site_name)
     const { data, error } = await supabaseAdmin
       .from("client_revenues")
       .select(`
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
         sites (
           id,
           site_code,
-          name
+          site_name
         )
       `)
       .eq("billing_period", period)

@@ -18,18 +18,18 @@ export async function GET() {
       .eq("id", session.userId)
       .single();
 
-    // 2. ดึงข้อมูลเงินเดือนจากตาราง payrolls ของพนักงานคนนั้นในเดือน ก.ค. 69 (รวม gross_income และ net_salary)
+    // 2. ดึงข้อมูลเงินเดือนจากตาราง payrolls โดยรองรับทั้ง "2026-07" และ "1/7/2026"
     const { data: payroll } = await supabase
       .from("payrolls")
       .select("daily_wage, work_days, gross_income, net_salary, total_deductions")
       .eq("employee_code", userProfile?.employee_code?.trim())
-      .eq("billing_period", "2026-07")
+      .or(`billing_period.eq.2026-07,billing_period.eq.1/7/2026`)
       .maybeSingle();
 
     const dailyWage = payroll?.daily_wage || 520;
     const workedDays = payroll?.work_days || 0;
     
-    // ดึงค่าจริงจากตาราง payrolls (ช่อง รวมเงินที่ได้รับ และ เงินเดือนคงเหลือ)
+    // ดึงค่าจริงจากตาราง payrolls
     const grossIncome = Number(payroll?.gross_income) || (dailyWage * workedDays);
     const netSalary = Number(payroll?.net_salary) || grossIncome;
     const totalDeductions = Number(payroll?.total_deductions) || 0;
@@ -59,9 +59,9 @@ export async function GET() {
       success: true,
       workedDays,
       dailyWage,
-      grossIncome,        // รายได้รวมจริง (เช่น 17,566)
-      netSalary,          // เงินเดือนคงเหลือสุทธิจริง (เช่น 11,976.72)
-      totalDeductions,    // ยอดรวมหักจริง
+      grossIncome,
+      netSalary,
+      totalDeductions,
       maxCredit,
       totalBorrowedThisMonth,
       remainingCredit,
