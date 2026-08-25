@@ -56,14 +56,80 @@ export default function CreateReportPage() {
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ฟังก์ชันช่วยย่อและบีบอัดรูปภาพฝั่ง Client ก่อนอัปโหลด
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
+
+          // กำหนดขนาด maxWidth / maxHeight สูงสุด (เช่น 1200 พิกเซล) เพื่อลดขนาดไฟล์
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 1200;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = Math.round((width * MAX_HEIGHT) / height);
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          // แปลงภาพเป็นไฟล์ JPEG ที่คุณภาพ 0.8 (80%) ซึ่งขนาดจะลดลงมากแต่ภาพยังคมชัด
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const compressedFile = new File([blob], file.name, {
+                  type: "image/jpeg",
+                  lastModified: Date.now(),
+                });
+                resolve(compressedFile);
+              } else {
+                resolve(file); // ถ้าบีบอัดไม่สำเร็จ ให้ใช้ไฟล์เดิม
+              }
+            },
+            "image/jpeg",
+            0.8
+          );
+        };
+      };
+    });
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files);
-      const newImages = [...images, ...selectedFiles];
-      setImages(newImages);
+      setLoading(true);
 
-      const newPreviews = selectedFiles.map((file) => URL.createObjectURL(file));
-      setPreviews([...previews, ...newPreviews]);
+      try {
+        // ทำการบีบอัดทุกรูปภาพที่ผู้ใช้เลือกเข้ามาพร้อมกัน
+        const compressedFiles = await Promise.all(selectedFiles.map((file) => compressImage(file)));
+
+        const newImages = [...images, ...compressedFiles];
+        setImages(newImages);
+
+        const newPreviews = compressedFiles.map((file) => URL.createObjectURL(file));
+        setPreviews([...previews, ...newPreviews]);
+      } catch (err) {
+        console.error("Compression error:", err);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -266,7 +332,7 @@ export default function CreateReportPage() {
             disabled={loading}
             className="w-full py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm rounded-2xl shadow-lg shadow-orange-500/20 transition disabled:opacity-50 cursor-pointer"
           >
-            {loading ? "กำลังส่งรายงาน..." : "🚀 ส่งรายงานการตรวจตรา"}
+            {loading ? "กำลังประมวลผลรูปภาพ / ส่งรายงาน..." : "🚀 ส่งรายงานการตรวจตรา"}
           </button>
 
         </form>
