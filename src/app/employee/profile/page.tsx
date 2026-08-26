@@ -10,11 +10,6 @@ export default function EmployeeProfilePage() {
   const [loading, setLoading] = useState(true);
 
   const [loanSummary, setLoanSummary] = useState({
-    workedDays: 0,
-    dailyWage: 520,
-    grossIncome: 0,
-    netSalary: 0,
-    totalDeductions: 0,
     totalBorrowedThisMonth: 0,
     remainingCredit: 10000,
   });
@@ -22,7 +17,6 @@ export default function EmployeeProfilePage() {
 
   const [showNotiModal, setShowNotiModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
-
   const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
@@ -40,11 +34,6 @@ export default function EmployeeProfilePage() {
       const dataLoan = await resLoan.json();
       if (dataLoan.success) {
         setLoanSummary({
-          workedDays: dataLoan.workedDays || 0,
-          dailyWage: dataLoan.dailyWage || 520,
-          grossIncome: dataLoan.grossIncome || 0,
-          netSalary: dataLoan.netSalary || 0,
-          totalDeductions: dataLoan.totalDeductions || 0,
           totalBorrowedThisMonth: dataLoan.totalBorrowedThisMonth || 0,
           remainingCredit: dataLoan.remainingCredit || 10000,
         });
@@ -56,12 +45,18 @@ export default function EmployeeProfilePage() {
     }
   };
 
-  // ปัดเศษตัวเลขทั้งหมดให้เป็นจำนวนเต็มด้วย Math.round()
-  const dailyWage = Math.round(loanSummary.dailyWage || 520);
-  const workedDays = loanSummary.workedDays || 0;
-  const grossEarnings = Math.round(loanSummary.grossIncome || (workedDays * dailyWage));
-  const netSalaryPayable = Math.round(loanSummary.netSalary || grossEarnings);
-  const totalDeduction = Math.round(loanSummary.totalDeductions || 0);
+  // ดึงข้อมูลจริงจากตาราง payrolls ผ่าน profile ที่ดึงมา
+  const dailyWage = Math.round(profile?.dailyRate || 520);
+  const workedDays = profile?.workedDays || 20;
+  const grossEarnings = Math.round(profile?.grossIncome || (workedDays * dailyWage));
+  const totalDeduction = Math.round(profile?.totalDeductions || 0);
+  
+  // คำนวณสุทธิคาดว่าจะได้รับ (รายได้รวม - ยอดรวมหัก)
+  const netSalaryPayable = Math.round((profile?.netSalary || grossEarnings) - totalDeduction);
+
+  // คำนวณแยกสัดส่วนค่าจ้าง 8 ชม. และ OT 4 ชม.
+  const baseWage8Hrs = profile?.baseWage8Hrs || (dailyWage > 400 ? 400 : Math.round(dailyWage * 0.77));
+  const otRate = profile?.otRate || (dailyWage - baseWage8Hrs);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -297,9 +292,14 @@ export default function EmployeeProfilePage() {
                 <span>เบอร์โทรศัพท์:</span>
                 <span className="font-mono font-bold text-slate-900">{profile?.phone || "-"}</span>
               </div>
-              <div className="flex justify-between pb-1 border-b border-slate-100">
+              <div className="flex justify-between items-start pb-1 border-b border-slate-100">
                 <span>อัตราค่าจ้างรายวัน:</span>
-                <span className="font-mono font-bold text-emerald-700">฿{dailyWage}/วัน</span>
+                <div className="text-right">
+                  <span className="font-mono font-bold text-emerald-700 block">฿{dailyWage}/วัน</span>
+                  <span className="text-[10px] text-slate-400 block">
+                    (ค่าจ้าง 8 ชม. ฿{baseWage8Hrs} + OT 4 ชม. ฿{otRate})
+                  </span>
+                </div>
               </div>
               <div className="flex justify-between pb-1 border-b border-slate-100">
                 <span>ใบอนุญาต รปภ. (ธก.7):</span>
@@ -380,17 +380,17 @@ export default function EmployeeProfilePage() {
           <span className="text-base mb-0.5">👤</span>
           หน้าแรก
         </Link>
-        <Link href="/employee/leaves" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
-          <span className="text-base mb-0.5">📝</span>
-          ระบบลา
-        </Link>
         <Link href="/employee/attendance" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
           <span className="text-base mb-0.5">⏱️</span>
           ลงเวลาทำงาน
         </Link>
-        <Link href="/employee/shifts" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
-          <span className="text-base mb-0.5">📅</span>
-          ตารางเวร
+        <Link href="/employee/reports" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
+          <span className="text-base mb-0.5">🛡️</span>
+          รายงาน
+        </Link>
+        <Link href="/employee/payrolls" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
+          <span className="text-base mb-0.5">💵</span>
+          เงินเดือน
         </Link>
       </nav>
     </div>

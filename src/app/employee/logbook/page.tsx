@@ -125,23 +125,25 @@ export default function EmployeeIncidentPage() {
             <h1 className="text-lg font-bold">KMS Employee Portal</h1>
           </div>
 
-          <nav className="flex items-center gap-2 flex-wrap justify-center text-sm font-semibold">
-            <Link href="/employee/profile" className="px-3 py-2 hover:bg-slate-800 text-slate-300 rounded-lg transition">
-              หน้าแรก
-            </Link>
-            <Link href="/employee/leaves" className="px-3 py-2 hover:bg-slate-800 text-slate-300 rounded-lg transition">
-              ระบบลา
-            </Link>
-            <Link href="/employee/attendance" className="px-3 py-2 hover:bg-slate-800 text-slate-300 rounded-lg transition">
-              ลงเวลาทำงาน
-            </Link>
-            <Link href="/employee/logbook" className="px-3 py-2 bg-slate-800 text-orange-400 rounded-lg">
-              รายงานการทำงาน
-            </Link>
-            <Link href="/employee/shifts" className="px-3 py-2 hover:bg-slate-800 text-slate-300 rounded-lg transition">
-              ตารางเวร
-            </Link>
-          </nav>
+          {/* Bottom Navigation Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-2 py-2 flex justify-around items-center z-50 shadow-lg">
+        <Link href="/employee/profile" className="flex flex-col items-center text-orange-400 text-[10px] font-semibold transition">
+          <span className="text-base mb-0.5">👤</span>
+          หน้าแรก
+        </Link>
+        <Link href="/employee/attendance" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
+          <span className="text-base mb-0.5">⏱️</span>
+          ลงเวลาทำงาน
+        </Link>
+        <Link href="/employee/reports" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
+          <span className="text-base mb-0.5">🛡️</span>
+          รายงาน
+        </Link>
+        <Link href="/employee/payrolls" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
+          <span className="text-base mb-0.5">💵</span>
+          เงินเดือน
+        </Link>
+      </nav>
         </div>
       </header>
 

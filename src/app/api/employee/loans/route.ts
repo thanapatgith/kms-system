@@ -18,23 +18,51 @@ export async function GET() {
       .eq("id", session.userId)
       .single();
 
-    // 2. ดึงข้อมูลเงินเดือนจากตาราง payrolls โดยรองรับทั้ง "2026-07" และ "1/7/2026"
+    // 2. ดึงข้อมูลเงินเดือนจากตาราง payrolls
     const { data: payroll } = await supabase
       .from("payrolls")
       .select("daily_wage, work_days, gross_income, net_salary, total_deductions")
       .eq("employee_code", userProfile?.employee_code?.trim())
-      .or(`billing_period.eq.2026-07,billing_period.eq.1/7/2026`)
+      .or(`billing_period.eq.2026-08,billing_period.eq.1/8/2026,billing_period.eq.2026-07,billing_period.eq.1/7/2026`)
       .maybeSingle();
 
     const dailyWage = payroll?.daily_wage || 520;
-    const workedDays = payroll?.work_days || 0;
     
-    // ดึงค่าจริงจากตาราง payrolls
-    const grossIncome = Number(payroll?.gross_income) || (dailyWage * workedDays);
+    // ปรับวันทำงานให้สะท้อนตามรอบจริง (ตัดรอบเดือนละประมาณ 20 วันตามรอบการจ่ายวันที่ 10)
+    // หากใน payrolls บันทึกมา 31 วัน เราจะปรับสัดส่วนวันทำงานจริงสำหรับคำนวณสิทธิ์กู้ยืมในรอบนี้ให้เป็น 20 วัน
+    const rawWorkDays = Number(payroll?.work_days) || 31;
+    const workedDays = rawWorkDays > 20 ? 20 : rawWorkDays; 
+
+    // คำนวณรายได้รวมและวงเงินกู้สูงสุด (85% ของค่าจ้างตามวันทำงานจริงในรอบนี้)
+    const grossIncome = dailyWage * workedDays;
+    const maxCredit = Math.floor(grossIncome * 0.85);
+
     const netSalary = Number(payroll?.net_salary) || grossIncome;
     const totalDeductions = Number(payroll?.total_deductions) || 0;
 
-    // 3. ดึงประวัติการกู้และคำนวณยอดสะสม
+    // 3. คำนวณรอบเบิกและช่วงเวลาเปิด-ปิดตามกฎใหม่
+    const now = new Date();
+    const currentDay = now.getDate(); // วันที่ปัจจุบัน (1-31)
+    
+    let targetRound = 20;
+    let isWindowOpen = false;
+
+    // กฎรอบเบิก:
+    // - วันที่ 11 ถึง 17 เปิดรอบวันที่ 20
+    // - วันที่ 18 ถึง 27 เปิดรอบวันที่ 30
+    // - นอกนั้น ปิดรับยื่นกู้
+    if (currentDay >= 11 && currentDay <= 17) {
+      targetRound = 20;
+      isWindowOpen = true;
+    } else if (currentDay >= 18 && currentDay <= 27) {
+      targetRound = 30;
+      isWindowOpen = true;
+    } else {
+      targetRound = (currentDay > 27 || currentDay <= 10) ? 20 : 30;
+      isWindowOpen = false;
+    }
+
+    // 4. ดึงประวัติการกู้และคำนวณยอดสะสม
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
     const { data: monthLoans } = await supabase
       .from("loan_requests")
@@ -45,8 +73,6 @@ export async function GET() {
 
     const totalBorrowedThisMonth = (monthLoans || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
-    // 4. คำนวณสิทธิ์ (ใช้ 85% ของรายได้รวมจริง)
-    const maxCredit = Math.floor(grossIncome * 0.85);
     const remainingCredit = Math.max(0, maxCredit - totalBorrowedThisMonth);
 
     const { data: allLoans } = await supabase
@@ -57,6 +83,8 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
+      targetRound,
+      isWindowOpen,
       workedDays,
       dailyWage,
       grossIncome,
