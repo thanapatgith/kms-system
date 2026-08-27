@@ -14,7 +14,7 @@ export async function GET() {
     // 1. ดึง employee_code จากตาราง users ก่อน
     const { data: userProfile } = await supabase
       .from("users")
-      .select("employee_code")
+      .select("employee_code, branch")
       .eq("id", session.userId)
       .single();
 
@@ -28,18 +28,15 @@ export async function GET() {
 
     const dailyWage = payroll?.daily_wage || 520;
     
-    // ปรับวันทำงานให้สะท้อนตามรอบจริง
     const rawWorkDays = Number(payroll?.work_days) || 31;
     const workedDays = rawWorkDays > 20 ? 20 : rawWorkDays; 
 
-    // คำนวณรายได้รวมและวงเงินกู้สูงสุด (85%)
     const grossIncome = dailyWage * workedDays;
     const maxCredit = Math.floor(grossIncome * 0.85);
 
     const netSalary = Number(payroll?.net_salary) || grossIncome;
     const totalDeductions = Number(payroll?.total_deductions) || 0;
 
-    // 3. คำนวณรอบเบิกและช่วงเวลาเปิด-ปิดตามกฎใหม่
     const now = new Date();
     const currentDay = now.getDate();
     
@@ -57,7 +54,6 @@ export async function GET() {
       isWindowOpen = false;
     }
 
-    // 4. ดึงประวัติการกู้และคำนวณยอดสะสม (แก้ไขชื่อฟิลด์ให้ตรงกับตาราง loan_requests คือ requested_amount)
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
     const { data: monthLoans } = await supabase
       .from("loan_requests")
@@ -67,7 +63,6 @@ export async function GET() {
       .neq("status", "REJECTED");
 
     const totalBorrowedThisMonth = (monthLoans || []).reduce((sum, item) => sum + (Number(item.requested_amount) || 0), 0);
-
     const remainingCredit = Math.max(0, maxCredit - totalBorrowedThisMonth);
 
     const { data: allLoans } = await supabase
@@ -93,9 +88,62 @@ export async function GET() {
 
   } catch (error: any) {
     console.error("Get loan error:", error);
-    // ป้องกัน JSON parsing error โดยบังคับคืนค่า JSON เสมอแม้เกิด Error
     return NextResponse.json(
       { success: false, error: error.message || "เกิดข้อผิดพลาดในการดึงข้อมูล" },
+      { status: 500 }
+    );
+  }
+}
+
+// ⭐ เพิ่มฟังก์ชัน POST สำหรับรับคำขอกู้ยืมเงิน
+export async function POST(req: Request) {
+  try {
+    const session = await getSession();
+    if (!session || !session.userId) {
+      return NextResponse.json({ success: false, error: "ยังไม่ได้เข้าสู่ระบบ" }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { amount, reason } = body;
+
+    const requestedAmount = Number(amount);
+    if (!requestedAmount || requestedAmount <= 0) {
+      return NextResponse.json({ success: false, error: "กรุณาระบุจำนวนเงินให้ถูกต้อง" }, { status: 400 });
+    }
+
+    // ดึงข้อมูลโปรไฟล์ผู้ใช้เพื่อเอา employee_code
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("employee_code, name, branch")
+      .eq("id", session.userId)
+      .single();
+
+    // บันทึกลงตาราง loan_requests
+    const { error: insertError } = await supabase
+      .from("loan_requests")
+      .insert([
+        {
+          user_id: session.userId,
+          employee_code: userProfile?.employee_code || "",
+          employee_name: userProfile?.name || "พนักงาน",
+          branch: userProfile?.branch || "สำนักงานใหญ่",
+          requested_amount: requestedAmount,
+          reason: reason || "ไม่มีเหตุผลระบุ",
+          status: "PENDING", // รออนุมัติ
+          created_at: new Date().toISOString(),
+        }
+      ]);
+
+    if (insertError) {
+      throw new Error(insertError.message);
+    }
+
+    return NextResponse.json({ success: true, message: "ยื่นคำขอสำเร็จ" }, { status: 200 });
+
+  } catch (error: any) {
+    console.error("Post loan error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูล" },
       { status: 500 }
     );
   }
