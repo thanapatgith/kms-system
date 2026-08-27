@@ -11,10 +11,10 @@ export async function GET() {
       return NextResponse.json({ error: "ยังไม่ได้เข้าสู่ระบบ" }, { status: 401 });
     }
 
-    // 1. ดึง employee_code จากตาราง users ก่อน
+    // 1. ดึง employee_code จากตาราง users
     const { data: userProfile } = await supabase
       .from("users")
-      .select("employee_code, branch")
+      .select("employee_code")
       .eq("id", session.userId)
       .single();
 
@@ -54,6 +54,7 @@ export async function GET() {
       isWindowOpen = false;
     }
 
+    // 3. ดึงประวัติการกู้และคำนวณยอดสะสมจากฟิลด์ amount
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
     const { data: monthLoans } = await supabase
       .from("loan_requests")
@@ -62,7 +63,7 @@ export async function GET() {
       .gte("created_at", startOfMonth)
       .neq("status", "REJECTED");
 
-    const totalBorrowedThisMonth = (monthLoans || []).reduce((sum, item) => sum + (Number(item.requested_amount) || 0), 0);
+    const totalBorrowedThisMonth = (monthLoans || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const remainingCredit = Math.max(0, maxCredit - totalBorrowedThisMonth);
 
     const { data: allLoans } = await supabase
@@ -95,7 +96,7 @@ export async function GET() {
   }
 }
 
-// ⭐ เพิ่มฟังก์ชัน POST สำหรับรับคำขอกู้ยืมเงิน
+// 4. ฟังก์ชัน POST บันทึกข้อมูลตามโครงสร้างตารางจริง
 export async function POST(req: Request) {
   try {
     const session = await getSession();
@@ -111,25 +112,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "กรุณาระบุจำนวนเงินให้ถูกต้อง" }, { status: 400 });
     }
 
-    // ดึงข้อมูลโปรไฟล์ผู้ใช้เพื่อเอา employee_code
-    const { data: userProfile } = await supabase
-      .from("users")
-      .select("employee_code, name, branch")
-      .eq("id", session.userId)
-      .single();
-
-    // บันทึกลงตาราง loan_requests
+    // บันทึกลงตาราง loan_requests เฉพาะฟิลด์ที่มีในฐานข้อมูล
     const { error: insertError } = await supabase
       .from("loan_requests")
       .insert([
         {
           user_id: session.userId,
-          employee_code: userProfile?.employee_code || "",
-          employee_name: userProfile?.name || "พนักงาน",
-          branch: userProfile?.branch || "สำนักงานใหญ่",
-          requested_amount: requestedAmount,
+          amount: requestedAmount,
           reason: reason || "ไม่มีเหตุผลระบุ",
-          status: "PENDING", // รออนุมัติ
+          status: "PENDING",
           created_at: new Date().toISOString(),
         }
       ]);
