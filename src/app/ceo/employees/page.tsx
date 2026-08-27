@@ -52,7 +52,7 @@ export default function CEOEmployeesPage() {
 
       if (usersError) throw usersError;
 
-      // 2. ดึงข้อมูล payrolls ทั้งหมดในระบบ (เพื่อใช้เทียบเดือนที่เลือกและหาเดือนล่าสุดสำรอง)
+      // 2. ดึงข้อมูล payrolls ทั้งหมด
       const { data: payrollsData } = await supabase
         .from("payrolls")
         .select("employee_code, daily_wage, site_name, total_advance, net_salary, work_days, billing_period");
@@ -62,51 +62,52 @@ export default function CEOEmployeesPage() {
         .from("loan_requests")
         .select("employee_code, requested_amount, status");
 
-      // จับคู่ข้อมูลจริงเข้าด้วยกัน
+      // จับคู่ข้อมูล
       const combined = (usersData || []).map((user) => {
         const code = (user.employee_code || "").trim();
         
-        // กรอง payroll ของพนักงานคนนี้ทั้งหมด
         const empPayrolls = (payrollsData || []).filter(
           (p) => (p.employee_code || "").trim() === code
         );
 
-        // หา payroll ของเดือนที่เลือกตรงๆ
-        let matchedPayroll = empPayrolls.find((p) => {
+        // เช็คว่ามีข้อมูลของ "เดือนที่เลือกตรงๆ" หรือไม่
+        const exactMonthPayroll = empPayrolls.find((p) => {
           const bp = String(p.billing_period || "");
           return bp.includes(monthStr) || bp.includes(String(targetMonthNum)) || bp.includes(String(targetYearBE));
         });
 
-        // ⭐ ถ้าเดือนที่ดึง "ไม่มีข้อมูล" ให้ใช้ข้อมูลของงวดล่าสุดที่มีในระบบแทน (Fallback อ้างอิงเดือนก่อนหน้า)
-        if (!matchedPayroll && empPayrolls.length > 0) {
-          // สมมติให้เลือกรายการล่าสุด (หรือรายการแรกที่เจอ) มาเป็นตัวอ้างอิงชั่วคราว
-          matchedPayroll = empPayrolls[empPayrolls.length - 1];
+        if (exactMonthPayroll) {
+          const empLoans = (loansData || []).filter(
+            (l) => (l.employee_code || "").trim() === code && l.status === "APPROVED"
+          );
+          const totalLoanAmount = empLoans.reduce((sum, l) => sum + (Number(l.requested_amount) || 0), 0);
+          const payrollAdvance = Number(exactMonthPayroll.total_advance) || 0;
+          const finalLoan = totalLoanAmount > 0 ? totalLoanAmount : payrollAdvance;
+
+          return {
+            ...user,
+            actualSite: exactMonthPayroll.site_name || user.branch || "KMS หน่วยงานหลัก",
+            dailyWage: exactMonthPayroll.daily_wage || user.wage || 520,
+            workDays: exactMonthPayroll.work_days || 0,
+            totalLoan: finalLoan,
+            isUsingFallbackSite: false,
+            hasDataThisMonth: true,
+          };
+        } else {
+          const latestPayroll = empPayrolls.length > 0 ? empPayrolls[empPayrolls.length - 1] : null;
+          const fallbackSite = latestPayroll?.site_name || user.branch || user.site_name || "KMS หน่วยงานหลัก";
+          const fallbackWage = latestPayroll?.daily_wage || user.wage || 520;
+
+          return {
+            ...user,
+            actualSite: fallbackSite,
+            dailyWage: fallbackWage,
+            workDays: "-",
+            totalLoan: 0,
+            isUsingFallbackSite: true,
+            hasDataThisMonth: false,
+          };
         }
-
-        // ยอดกู้/เบิก
-        const empLoans = (loansData || []).filter(
-          (l) => (l.employee_code || "").trim() === code && l.status === "APPROVED"
-        );
-        const totalLoanAmount = empLoans.reduce((sum, l) => sum + (Number(l.requested_amount) || 0), 0);
-        const payrollAdvance = matchedPayroll ? Number(matchedPayroll.total_advance) || 0 : 0;
-        const finalLoan = totalLoanAmount > 0 ? totalLoanAmount : payrollAdvance;
-
-        // หน่วยงานและเรตค่าจ้าง (ถ้าไม่มีข้อมูลเดือนนี้ จะดึงจากเดือนก่อนหน้าหรือข้อมูลหลักมาแสดง)
-        const actualSite = matchedPayroll?.site_name || user.branch || user.site_name || "KMS หน่วยงานหลัก";
-        const dailyWage = matchedPayroll?.daily_wage || user.wage || user.daily_wage || 520;
-        const workDays = matchedPayroll ? (matchedPayroll.work_days || 0) : "-";
-
-        return {
-          ...user,
-          actualSite,
-          dailyWage,
-          workDays,
-          totalLoan: finalLoan,
-          isUsingFallback: !empPayrolls.find((p) => {
-            const bp = String(p.billing_period || "");
-            return bp.includes(monthStr) || bp.includes(String(targetMonthNum)) || bp.includes(String(targetYearBE));
-          })
-        };
       });
 
       setEmployees(combined);
@@ -179,7 +180,7 @@ export default function CEOEmployeesPage() {
           />
 
           <div className="flex justify-between items-center text-[10px] text-slate-400 pt-1 border-t border-slate-100">
-            <span>*(หากเดือนนี้ยังไม่อัปเดต จะอ้างอิงข้อมูลล่าสุดให้)*</span>
+            <span>*(ยอดเงิน/ยอดกู้จะแสดงเฉพาะเดือนที่มีการอัปเดต)*</span>
             <span className="font-bold text-slate-700">พบทั้งหมด {filteredEmployees.length} คน</span>
           </div>
         </div>
@@ -207,16 +208,23 @@ export default function CEOEmployeesPage() {
 
                 <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 font-mono bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                   <div>เรตค่าจ้าง: <strong className="text-slate-900">฿{Number(emp.dailyWage || 0).toLocaleString()}</strong></div>
+                  
                   <div>ยอดกู้/เบิก: <strong className={emp.totalLoan > 0 ? "text-rose-600" : "text-slate-500"}>
                     {emp.totalLoan > 0 ? `฿${emp.totalLoan.toLocaleString()}` : "ไม่มี"}
                   </strong></div>
                   
-                  <div className="col-span-2 pt-1 border-t border-slate-200/60 font-sans text-slate-700 flex justify-between items-center">
-                    <span>
-                      🏢 หน่วยงาน: <strong className="text-slate-900">{emp.actualSite}</strong>
-                      {emp.isUsingFallback && <span className="text-[9px] text-amber-600 ml-1 font-normal">(อ้างอิงข้อมูลล่าสุด)</span>}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">ทำงาน: {emp.workDays} วัน</span>
+                  {/* จัดให้อยู่โซนเดียวกันด้านล่าง: หน่วยงาน + วันทำงาน */}
+                  <div className="col-span-2 pt-1.5 border-t border-slate-200/60 font-sans text-slate-700 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span>
+                        🏢 หน่วยงาน: <strong className="text-slate-900">{emp.actualSite}</strong>
+                        {emp.isUsingFallbackSite && <span className="text-[9px] text-amber-600 ml-1 font-normal">(อ้างอิงข้อมูลล่าสุด)</span>}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-[11px] text-slate-500 font-mono">
+                      <span>📅 วันทำงานประจำงวด:</span>
+                      <strong className="text-slate-800">{emp.workDays} {emp.workDays !== "-" ? "วัน" : ""}</strong>
+                    </div>
                   </div>
 
                   <div className="col-span-2 text-slate-500 font-sans border-t border-slate-200/40 pt-1">
