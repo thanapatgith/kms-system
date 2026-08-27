@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-// --- วางตรงนี้ครับ (ก่อน export default function) ---
+// --- ฟังก์ชันจัดการเลือกเดือน ---
 function getCurrentPeriod() {
   const now = new Date();
   const year = now.getFullYear();
@@ -32,6 +33,7 @@ function generateMonthOptions() {
 }
 
 export default function CEODashboardPage() {
+  const router = useRouter();
   const [selectedMonth, setSelectedMonth] = useState(getCurrentPeriod());
   const monthOptions = generateMonthOptions();
 
@@ -84,16 +86,16 @@ export default function CEODashboardPage() {
               <h2 className="text-base font-bold">สวัสดีครับ คุณอภิวรรณ 👋</h2>
             </div>
             <select
-  value={selectedMonth}
-  onChange={(e) => setSelectedMonth(e.target.value)}
-  className="bg-slate-900/80 text-amber-300 border border-amber-500/30 text-[10px] font-bold rounded-md px-2 py-1 focus:outline-none cursor-pointer"
->
-  {monthOptions.map((opt) => (
-    <option key={opt.value} value={opt.value} className="bg-slate-900 text-white">
-      {opt.label} {opt.value === getCurrentPeriod() ? "" : ""}
-    </option>
-  ))}
-</select>
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-slate-900/80 text-amber-300 border border-amber-500/30 text-[10px] font-bold rounded-md px-2 py-1 focus:outline-none cursor-pointer"
+            >
+              {monthOptions.map((opt) => (
+                <option key={opt.value} value={opt.value} className="bg-slate-900 text-white">
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
           <p className="text-[11px] text-slate-300 pt-1">
             สรุปผลประกอบการ วิเคราะห์กำไร และการบริหารจัดการยุทธศาสตร์
@@ -106,7 +108,7 @@ export default function CEODashboardPage() {
             <span className="flex items-center gap-1.5">
               <span>🔔</span> การแจ้งเตือนยุทธศาสตร์
             </span>
-            <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-bold">
+            <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-bold">
               3 เรื่อง
             </span>
           </div>
@@ -177,6 +179,7 @@ export default function CEODashboardPage() {
           <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
             <span>📊</span> สถานะกำลังพลและการปฏิบัติงานวันนี้
           </span>
+
           <div className="grid grid-cols-4 gap-2">
             <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm text-center">
               <span className="text-[10px] text-slate-400 block font-medium">พนักงานรวม</span>
@@ -219,6 +222,18 @@ export default function CEODashboardPage() {
               <div className="flex items-center gap-2">
                 <span className="text-base">💳</span>
                 <span>รายงานเงินเดือน</span>
+              </div>
+              <span className="text-slate-400 group-hover:text-amber-600">›</span>
+            </Link>
+
+            {/* 🆕 เพิ่มเมนูลัด "รายชื่อพนักงาน" ตรงนี้ */}
+            <Link
+              href="/ceo/employees"
+              className="p-3 bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-300 rounded-xl font-bold text-slate-800 flex items-center justify-between transition group"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-base">👥</span>
+                <span>รายชื่อพนักงาน</span>
               </div>
               <span className="text-slate-400 group-hover:text-amber-600">›</span>
             </Link>
