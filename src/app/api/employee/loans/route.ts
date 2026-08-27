@@ -28,12 +28,11 @@ export async function GET() {
 
     const dailyWage = payroll?.daily_wage || 520;
     
-    // ปรับวันทำงานให้สะท้อนตามรอบจริง (ตัดรอบเดือนละประมาณ 20 วันตามรอบการจ่ายวันที่ 10)
-    // หากใน payrolls บันทึกมา 31 วัน เราจะปรับสัดส่วนวันทำงานจริงสำหรับคำนวณสิทธิ์กู้ยืมในรอบนี้ให้เป็น 20 วัน
+    // ปรับวันทำงานให้สะท้อนตามรอบจริง
     const rawWorkDays = Number(payroll?.work_days) || 31;
     const workedDays = rawWorkDays > 20 ? 20 : rawWorkDays; 
 
-    // คำนวณรายได้รวมและวงเงินกู้สูงสุด (85% ของค่าจ้างตามวันทำงานจริงในรอบนี้)
+    // คำนวณรายได้รวมและวงเงินกู้สูงสุด (85%)
     const grossIncome = dailyWage * workedDays;
     const maxCredit = Math.floor(grossIncome * 0.85);
 
@@ -42,15 +41,11 @@ export async function GET() {
 
     // 3. คำนวณรอบเบิกและช่วงเวลาเปิด-ปิดตามกฎใหม่
     const now = new Date();
-    const currentDay = now.getDate(); // วันที่ปัจจุบัน (1-31)
+    const currentDay = now.getDate();
     
     let targetRound = 20;
     let isWindowOpen = false;
 
-    // กฎรอบเบิก:
-    // - วันที่ 11 ถึง 17 เปิดรอบวันที่ 20
-    // - วันที่ 18 ถึง 27 เปิดรอบวันที่ 30
-    // - นอกนั้น ปิดรับยื่นกู้
     if (currentDay >= 11 && currentDay <= 17) {
       targetRound = 20;
       isWindowOpen = true;
@@ -62,7 +57,7 @@ export async function GET() {
       isWindowOpen = false;
     }
 
-    // 4. ดึงประวัติการกู้และคำนวณยอดสะสม
+    // 4. ดึงประวัติการกู้และคำนวณยอดสะสม (แก้ไขชื่อฟิลด์ให้ตรงกับตาราง loan_requests คือ requested_amount)
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
     const { data: monthLoans } = await supabase
       .from("loan_requests")
@@ -71,7 +66,7 @@ export async function GET() {
       .gte("created_at", startOfMonth)
       .neq("status", "REJECTED");
 
-    const totalBorrowedThisMonth = (monthLoans || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    const totalBorrowedThisMonth = (monthLoans || []).reduce((sum, item) => sum + (Number(item.requested_amount) || 0), 0);
 
     const remainingCredit = Math.max(0, maxCredit - totalBorrowedThisMonth);
 
@@ -98,6 +93,10 @@ export async function GET() {
 
   } catch (error: any) {
     console.error("Get loan error:", error);
-    return NextResponse.json({ error: "เกิดข้อผิดพลาดในการดึงข้อมูล" }, { status: 500 });
+    // ป้องกัน JSON parsing error โดยบังคับคืนค่า JSON เสมอแม้เกิด Error
+    return NextResponse.json(
+      { success: false, error: error.message || "เกิดข้อผิดพลาดในการดึงข้อมูล" },
+      { status: 500 }
+    );
   }
 }
