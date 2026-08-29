@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { uploadReportImage } from "@/lib/supabaseStorage"; // ใช้วิธีอัปโหลดขึ้น Supabase Storage ที่แยก Bucket reports
+import { uploadReportImage } from "@/lib/supabaseStorage";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -26,8 +26,13 @@ export async function GET(req: Request) {
         year: "numeric",
         month: "short",
         day: "numeric",
+        timeZone: "Asia/Bangkok",
       }),
-      time: new Date(item.createdAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }),
+      time: new Date(item.createdAt).toLocaleTimeString("th-TH", { 
+        hour: "2-digit", 
+        minute: "2-digit",
+        timeZone: "Asia/Bangkok" // ปรับเวลาให้ตรงตามประเทศไทย
+      }),
       message: item.message,
       latitude: item.latitude,
       longitude: item.longitude,
@@ -46,7 +51,7 @@ export async function GET(req: Request) {
   }
 }
 
-// 2. สร้างและส่งรายงานเหตุการณ์ใหม่ พร้อมพิกัดและอัปโหลดรูปภาพขึ้น Supabase (POST)
+// 2. สร้างและส่งรายงานเหตุการณ์ใหม่ พร้อมพิกัด, ชื่อหน่วยงาน และอัปโหลดรูปภาพ (POST)
 export async function POST(req: Request) {
   try {
     const session = await getSession();
@@ -56,6 +61,7 @@ export async function POST(req: Request) {
 
     const formData = await req.formData();
     const message = formData.get("message") as string;
+    const branchName = formData.get("branch") as string; // รับชื่อหน่วยงานที่พนักงานเลือก
     const latitude = formData.get("latitude");
     const longitude = formData.get("longitude");
     const imageFiles = formData.getAll("images") as File[];
@@ -64,9 +70,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "กรุณากรอกข้อความรายงานเหตุการณ์/การตรวจตรา" }, { status: 400 });
     }
 
-    // จัดการอัปโหลดไฟล์รูปภาพขึ้น Supabase Storage (Bucket: reports) แทนการใช้ fs
+    // ค้นหา siteId จากชื่อหน่วยงาน (branchName) ที่เลือก
+    let targetSiteId: string | null = null;
+    if (branchName && branchName !== "หน่วยงานทั่วไป") {
+      const site = await prisma.site.findFirst({
+        where: { siteName: branchName },
+        select: { id: true },
+      });
+      if (site) {
+        targetSiteId = site.id;
+      }
+    }
+
+    // จัดการอัปโหลดไฟล์รูปภาพขึ้น Supabase Storage (Bucket: reports)
     const imageUrls: string[] = [];
-    
     if (imageFiles && imageFiles.length > 0) {
       for (const file of imageFiles) {
         if (file && typeof file.arrayBuffer === "function") {
@@ -79,10 +96,11 @@ export async function POST(req: Request) {
       }
     }
 
-    // บันทึกลงฐานข้อมูล Prisma
+    // บันทึกลงฐานข้อมูล Prisma พร้อมผูก siteId
     const newReport = await prisma.incidentReport.create({
       data: {
         userId: session.userId,
+        siteId: targetSiteId, // บันทึกรหัสไซต์งานลงไปตรงนี้
         message: message.trim(),
         latitude: latitude ? Number(latitude) : null,
         longitude: longitude ? Number(longitude) : null,
@@ -99,4 +117,4 @@ export async function POST(req: Request) {
     console.error("Post report error:", error);
     return NextResponse.json({ ok: false, error: error.message || "เกิดข้อผิดพลาดในการส่งรายงาน" }, { status: 500 });
   }
-} 
+}
