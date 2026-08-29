@@ -16,6 +16,24 @@ enum Role {
   WAREHOUSE
   SUPERVISOR
   EMPLOYEE
+  CLIENT
+}
+
+model Client {
+  id             String   @id @default(cuid())
+  companyName    String   @map("company_name")
+  contractNumber String?  @map("contract_number")
+  contactPerson  String?  @map("contact_person")
+  contactPhone   String?  @map("contact_phone")
+  accountantName String?  @map("accountant_name")
+  accountantPhone String? @map("accountant_phone")
+  monthlyFee     Float?   @map("monthly_fee")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  sites          Site[]
+
+  @@map("clients")
 }
 
 enum Gender {
@@ -43,11 +61,15 @@ model Site {
   id              String   @id @default(cuid())
   siteName        String   @map("site_name")
   locationDetails String   @map("location_details") @db.Text
+  clientId        String?  @map("client_id") // <--- เพิ่มฟิลด์เชื่อมโยงลูกค้ารายนี้
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
+
+  client          Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
   users           User[]
 
   @@index([siteName])
+  @@index([clientId])
   @@map("sites")
 }
 

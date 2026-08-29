@@ -70,7 +70,6 @@ export default function CreateLoanPage() {
 
   const openContractModal = () => {
     setShowContractModal(true);
-    // เช็คว่าถ้ากล่องข้อความสั้นจนไม่มี Scrollbar ให้ปลดล็อกได้ทันที
     setTimeout(() => {
       if (contractScrollRef.current) {
         const { scrollHeight, clientHeight } = contractScrollRef.current;
@@ -155,9 +154,9 @@ export default function CreateLoanPage() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-slate-100 pb-24">
+    <div className="w-full min-h-screen bg-slate-100 pb-24 text-base">
       <header className="bg-slate-900 text-white shadow-md sticky top-0 z-50">
-        <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-md mx-auto px-4 py-3.5 flex items-center justify-between">
           <Link href="/employee/loans" className="text-xs text-slate-300 hover:text-white font-bold flex items-center gap-1">
             ‹ กลับ
           </Link>
@@ -304,7 +303,6 @@ export default function CreateLoanPage() {
               <span>{formData.acceptedTerms ? "✓ อ่านสัญญาเรียบร้อยแล้ว (เปิดอ่านอีกครั้ง)" : "กดเพื่ออ่านหนังสือสัญญาฉบับเต็ม"}</span>
             </button>
 
-            {/* ล็อก Checkbox ไม่ให้คลิกตรงๆ ได้ ต้องอ่านผ่าน Modal เท่านั้น */}
             <div 
               onClick={openContractModal} 
               className="flex items-start gap-2.5 cursor-pointer pt-1"
@@ -335,10 +333,10 @@ export default function CreateLoanPage() {
 
       </main>
 
-      {/* Modal ป๊อปอัปอ่านสัญญา */}
+      {/* Modal ป๊อปอัปอ่านสัญญา - ปรับปรุงขนาดให้พอดีและสบายตา */}
       {showContractModal && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-5 space-y-4 border border-slate-100 my-auto flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-5 space-y-4 border border-slate-100 my-auto flex flex-col max-h-[90vh]">
             
             <div className="flex justify-between items-center border-b pb-3 shrink-0">
               <div className="flex items-center gap-2">
@@ -357,13 +355,13 @@ export default function CreateLoanPage() {
             <div
               ref={contractScrollRef}
               onScroll={handleContractScroll}
-              className="flex-1 overflow-y-auto p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-[11px] text-slate-700 space-y-3 leading-relaxed font-sans max-h-[300px]"
+              className="flex-1 overflow-y-auto p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-700 space-y-3 leading-relaxed font-sans max-h-[50vh]"
             >
-              <div className="text-center space-y-1 pb-2 border-b">
+              <div className="text-center space-y-1 pb-3 border-b">
                 <p className="font-bold text-slate-900 text-xs">
                   บริษัท รักษาความปลอดภัย เคเอ็ม การ์ด แอนด์ ซัพพลาย กรุ๊ป จำกัด
                 </p>
-                <p className="text-[10px] text-slate-500">
+                <p className="text-[11px] text-slate-500">
                   หนังสือสัญญากู้ยืมเงินพนักงาน และหนังสือยินยอมให้หักเงินค่าจ้าง
                 </p>
               </div>
@@ -384,7 +382,7 @@ export default function CreateLoanPage() {
                 <strong>ข้อ 3. กำหนดการชำระคืน:</strong> ยินยอมให้หักชำระคืนจากเงินเดือนในงวดจ่ายค่าจ้างถัดไป (ทุกวันที่ 10 ของเดือน)
               </p>
 
-              <p className="bg-orange-50 p-2 rounded-xl border border-orange-200 text-orange-900">
+              <p className="bg-orange-50 p-2.5 rounded-xl border border-orange-200 text-orange-900">
                 <strong>ข้อ 4. การยินยอมหักเงินค่าจ้าง:</strong> ผู้กู้ยินยอมและมอบอำนาจให้บริษัทฯ ดำเนินการหักเงินต้นและดอกเบี้ยจากเงินเดือน หรือค่าจ้างในงวดออกเงินเดือนได้ทันที
               </p>
 
@@ -392,22 +390,22 @@ export default function CreateLoanPage() {
                 <strong>ข้อ 5. เงื่อนไขการอนุมัติ:</strong> การขอกู้ยืมเงินสวัสดิการขึ้นอยู่กับการพิจารณาและอนุมัติของฝ่ายบริหารและฝ่ายบัญชีเป็นสำคัญ
               </p>
 
-              <div className="pt-2 text-[10px] text-slate-400 text-center font-mono border-t">
+              <div className="pt-2 text-[11px] text-slate-400 text-center font-mono border-t">
                 --- สิ้นสุดข้อความสัญญา (โปรดเลื่อนลงให้สุดเพื่อกดยินยอม) ---
               </div>
             </div>
 
             {!hasScrolledToBottom && (
-              <p className="text-[10px] text-orange-600 font-bold text-center animate-pulse shrink-0">
+              <p className="text-[11px] text-orange-600 font-bold text-center animate-pulse shrink-0">
                 👇 กรุณาเลื่อนอ่านข้อความสัญญาลงไปให้สุดด้านล่างเพื่อเปิดปุ่มยินยอม
               </p>
             )}
 
-            <div className="flex justify-end gap-2 pt-2 border-t shrink-0">
+            <div className="flex justify-end gap-2.5 pt-2 border-t shrink-0">
               <button
                 type="button"
                 onClick={() => setShowContractModal(false)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition cursor-pointer"
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition cursor-pointer text-xs"
               >
                 ปิดหน้าต่าง
               </button>
@@ -418,7 +416,7 @@ export default function CreateLoanPage() {
                   setFormData({ ...formData, acceptedTerms: true });
                   setShowContractModal(false);
                 }}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition disabled:opacity-40 cursor-pointer"
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition disabled:opacity-40 cursor-pointer text-xs"
               >
                 ✓ ยอมรับเงื่อนไขสัญญา
               </button>

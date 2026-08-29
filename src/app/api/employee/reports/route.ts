@@ -99,4 +99,4 @@ export async function POST(req: Request) {
     console.error("Post report error:", error);
     return NextResponse.json({ ok: false, error: error.message || "เกิดข้อผิดพลาดในการส่งรายงาน" }, { status: 500 });
   }
-}
+} 

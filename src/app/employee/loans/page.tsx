@@ -111,7 +111,7 @@ export default function EmployeeLoansPage() {
             <span className="px-3 py-1 bg-orange-500 font-extrabold text-xs rounded-lg uppercase tracking-wider shadow">
               EMPLOYEE
             </span>
-            <h1 className="text-base font-bold">สวัสดิการเบิกเงินล่วงหน้า & เงินกู้</h1>
+            <h1 className="text-base font-bold">สวัสดิการเบิกเงิน & เงินกู้</h1>
           </div>
         </div>
       </header>
@@ -119,11 +119,10 @@ export default function EmployeeLoansPage() {
       {/* Main Content */}
       <main className="max-w-md mx-auto px-4 mt-5 space-y-4">
         
-        {/* การ์ดสรุปวงเงิน & สิทธิ์คงเหลือ */}
+       {/* การ์ดสรุปวงเงิน & สิทธิ์คงเหลือ - ป้ายสถานะ 2 บรรทัด */}
         <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-5 shadow-xl space-y-4 border border-slate-700">
           <div className="flex justify-between items-start gap-2">
             <div>
-              {/* แยกข้อความและวงเล็บให้อยู่คนละบรรทัดชัดเจน */}
               <p className="text-xs text-slate-300 font-bold">
                 สิทธิ์กู้ยืมสูงสุด
               </p>
@@ -131,23 +130,25 @@ export default function EmployeeLoansPage() {
                 (85% ของค่าจ้าง {loanSummary.workedDays} วัน)
               </p>
             </div>
-            <span className={`px-3.5 py-1.5 text-xs font-bold rounded-full border shrink-0 ${
+            
+            {/* ปรับป้ายสถานะเป็น 2 บรรทัด */}
+            <div className={`px-3 py-2 text-xs font-bold rounded-2xl border text-center shrink-0 ${
               loanSummary.isWindowOpen 
                 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 animate-pulse" 
                 : "bg-slate-800 text-slate-300 border-slate-700"
             }`}>
-              {loanSummary.isWindowOpen 
-                ? `● รอบวันที่ ${loanSummary.targetRound} (เปิดรับยื่นเรื่อง)` 
-                : `🔒 รอบวันที่ ${loanSummary.targetRound} (ปิดรับคำร้อง)`}
-            </span>
+              <span className="block text-[11px] font-semibold">รอบวันที่ {loanSummary.targetRound}</span>
+              <span className="block text-xs font-extrabold mt-0.5">
+                {loanSummary.isWindowOpen ? "● (เปิดรับยื่นเรื่อง)" : "🔒 (ปิดรับคำร้อง)"}
+              </span>
+            </div>
           </div>
 
-          {/* ปรับแก้ระยะเว้นวรรคและโครงสร้างไม่ให้ตัวเลขเบียดขอบ */}
-          <div className="bg-slate-800/60 p-3.5 rounded-2xl border border-slate-700/50">
-            <span className="block text-xs text-slate-300 font-bold mb-1">
+          <div className="bg-slate-800/60 px-4 py-3.5 rounded-2xl border border-slate-700/50 flex justify-between items-center">
+            <span className="text-xs text-slate-300 font-bold">
               คงเหลือที่กู้ได้:
             </span>
-            <div className="text-3xl font-black font-mono text-orange-400 tracking-tight flex items-center gap-1">
+            <div className="text-2xl sm:text-3xl font-black font-mono text-orange-400 tracking-tight flex items-center gap-1">
               <span>฿</span>
               <span>{loanSummary.remainingCredit.toLocaleString()}</span>
             </div>
@@ -169,41 +170,41 @@ export default function EmployeeLoansPage() {
           </div>
         </div>
 
-        {/* ยื่นคำร้องกู้ยืมเงิน (รอบวันที่ 30) เปิดยื่น 18-27 ของเดือน + ปุ่มยื่นเรื่องกู้ยืม */}
-        <div className="bg-white rounded-2xl shadow-sm p-5 border-2 border-slate-200 flex justify-between items-center gap-3">
+       {/* ยื่นคำร้องกู้ยืมเงิน - เพิ่ม Padding และจัดระยะไม่ให้ชิดขอบ */}
+        <div className="bg-white rounded-2xl shadow-sm p-5 border-2 border-slate-200 space-y-4">
           <div className="space-y-1">
             <h3 className="text-sm font-extrabold text-slate-900 leading-snug">
-              ยื่นคำร้องกู้ยืมเงิน (รอบวันที่ {loanSummary.targetRound})
+              ยื่นคำร้องกู้ยืมเงิน รอบวันที่ {loanSummary.targetRound}
             </h3>
             <p className="text-xs text-slate-500 font-medium">
-              {loanSummary.targetRound === 20 ? "เปิดยื่น 11-17 ของเดือน" : "เปิดยื่น 18-27 ของเดือน"}
+              เปิดให้ยื่นเรื่องวันที่ {loanSummary.targetRound === 20 ? "11-17" : "18-27"} ของเดือนนี้
             </p>
           </div>
 
-          {!loanSummary.isWindowOpen ? (
-            <button
-              disabled
-              title="ไม่อยู่ในช่วงเวลาที่เปิดให้ยื่นกู้"
-              className="px-4 py-3 bg-slate-200 text-slate-500 text-xs font-bold rounded-xl shrink-0 cursor-not-allowed border border-slate-300"
-            >
-              🔒 นอกช่วงเวลายื่นกู้
-            </button>
-          ) : loanSummary.remainingCredit <= 0 ? (
-            <button
-              disabled
-              title="คุณใช้สิทธิ์กู้ยืมเต็มวงเงินของรอบนี้แล้ว"
-              className="px-4 py-3 bg-slate-200 text-slate-600 text-xs font-bold rounded-xl shrink-0 cursor-not-allowed border border-slate-300"
-            >
-              🚫 เต็มวงเงินสิทธิ์
-            </button>
-          ) : (
-            <Link
+          <div className="w-full">
+            {!loanSummary.isWindowOpen ? (
+              <button
+                disabled
+                className="w-full py-3 bg-slate-200 text-slate-500 text-xs font-bold rounded-xl cursor-not-allowed border border-slate-300 text-center block"
+              >
+                🔒 นอกช่วงเวลายื่นกู้
+              </button>
+            ) : loanSummary.remainingCredit <= 0 ? (
+              <button
+                disabled
+                className="w-full py-3 bg-slate-200 text-slate-600 text-xs font-bold rounded-xl cursor-not-allowed border border-slate-300 text-center block"
+              >
+                🚫 เต็มวงเงินสิทธิ์
+              </button>
+            ) : (
+              <Link
                 href="/employee/loans/create"
-                className="w-full sm:w-auto px-5 py-3 bg-orange-600 hover:bg-orange-700 text-white text-sm font-extrabold rounded-xl shadow-md transition text-center block"
+                className="w-full py-3.5 bg-orange-600 hover:bg-orange-700 text-white text-sm font-extrabold rounded-xl shadow-md transition text-center block"
               >
                 + ยื่นเรื่องกู้ยืม
               </Link>
-          )}
+            )}
+          </div>
         </div>
 
         {/* แจ้งเตือนเรื่องการคิดดอกเบี้ยและสรุปยอดหัก */}

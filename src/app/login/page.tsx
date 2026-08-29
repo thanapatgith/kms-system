@@ -35,8 +35,10 @@ export default function LoginPage() {
         // 1. แปลง Role เป็นตัวพิมพ์ใหญ่เพื่อความชัวร์
         const userRole = data.user?.role?.toUpperCase();
 
-        // 2. แยกเส้นทางตาม Role หลักของระบบ (ตัด /admin ออกทั้งหมด)
-        if (userRole === "CEO") {
+        // 2. แยกเส้นทางตาม Role รวมถึง CLIENT ไปที่ /client/dashboard
+        if (userRole === "CLIENT") {
+          window.location.href = "/client/dashboard";
+        } else if (userRole === "CEO") {
           window.location.href = "/ceo/dashboard";
         } else if (userRole === "SUPERVISOR") {
           window.location.href = "/supervisor/dashboard";
@@ -67,8 +69,8 @@ export default function LoginPage() {
             alt="KMS Logo"
             className="h-12 w-auto object-contain rounded"
           />
-          <h1 className="mt-4 text-2xl font-bold text-slate-900">Login ระบบพนักงาน</h1>
-          <p className="mt-1 text-sm text-slate-500">เข้าสู่ระบบ Employee Portal และจัดการองค์กร</p>
+          <h1 className="mt-4 text-2xl font-bold text-slate-900">Login ระบบ</h1>
+          <p className="mt-1 text-sm text-slate-500">เข้าสู่ระบบพนักงานและลูกค้า (Customer Portal)</p>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
