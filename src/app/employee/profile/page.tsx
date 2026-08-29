@@ -98,16 +98,16 @@ export default function EmployeeProfilePage() {
         
         {/* การ์ดต้อนรับ & ประมาณการเงิน */}
         <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-5 shadow-xl space-y-4 border border-slate-700">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm text-slate-300 font-medium">
+          <div className="flex justify-between items-start gap-2">
+            <div className="space-y-1 overflow-hidden">
+              <p className="text-sm text-slate-300 font-medium truncate">
                 ยินดีต้อนรับ, <strong className="text-white text-base">{profile?.name || "พนักงาน"}</strong>
               </p>
-              <p className="text-xs text-orange-400 font-bold mt-1">
+              <p className="text-xs text-orange-400 font-bold truncate">
                 📍 {profile?.branch || "หน่วยงานสังกัด KMS"}
               </p>
             </div>
-            <span className="px-3.5 py-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-xs font-bold shrink-0">
+            <span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-xs font-bold shrink-0">
               วันเงินออก 10 ถัดไป
             </span>
           </div>
