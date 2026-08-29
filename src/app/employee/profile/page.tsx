@@ -166,90 +166,108 @@ export default function EmployeeProfilePage() {
           </Link>
         </div>
 
-        {/* เมนูลัดบริการพนักงาน */}
+        {/* เมนูลัดบริการพนักงาน - ปรับเป็น 1 คอลัมน์เพื่อให้ปุ่มใหญ่และกดง่ายสำหรับผู้สูงอายุ */}
         <div className="space-y-3">
           <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2 px-1">
             <span>⚡</span>
             <span>เมนูลัดบริการพนักงาน</span>
           </h3>
           
-          <div className="grid grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 gap-3">
             <Link
               href="/employee/leaves"
-              className="p-4 bg-white rounded-2xl border-2 border-slate-200 shadow-sm hover:border-orange-500 transition flex items-center gap-3.5"
+              className="p-4 bg-white rounded-2xl border-2 border-slate-200 shadow-sm hover:border-orange-500 transition flex items-center justify-between"
             >
-              <div className="w-12 h-12 bg-orange-100 text-orange-700 rounded-2xl flex items-center justify-center text-2xl shrink-0 font-bold shadow-sm">
-                📝
+              <div className="flex items-center gap-4">
+                <div className="w-13 h-13 bg-orange-100 text-orange-700 rounded-2xl flex items-center justify-center text-2xl shrink-0 font-bold shadow-sm">
+                  📝
+                </div>
+                <div>
+                  <h4 className="text-base font-extrabold text-slate-900">ยื่นใบลา</h4>
+                  <p className="text-xs text-slate-500 font-medium">ยื่นใบลา ป่วย, กิจ, พักร้อน</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-sm font-extrabold text-slate-900">ยื่นใบลา</h4>
-                <p className="text-xs text-slate-500 font-medium">ป่วย, กิจ, พักร้อน</p>
-              </div>
+              <span className="text-slate-400 font-bold text-lg pr-2">›</span>
             </Link>
 
             <Link
               href="/employee/attendance"
-              className="p-4 bg-white rounded-2xl border-2 border-slate-200 shadow-sm hover:border-orange-500 transition flex items-center gap-3.5"
+              className="p-4 bg-white rounded-2xl border-2 border-slate-200 shadow-sm hover:border-orange-500 transition flex items-center justify-between"
             >
-              <div className="w-12 h-12 bg-orange-100 text-orange-700 rounded-2xl flex items-center justify-center text-2xl shrink-0 font-bold shadow-sm">
-                ⏱️
+              <div className="flex items-center gap-4">
+                <div className="w-13 h-13 bg-orange-100 text-orange-700 rounded-2xl flex items-center justify-center text-2xl shrink-0 font-bold shadow-sm">
+                  ⏱️
+                </div>
+                <div>
+                  <h4 className="text-base font-extrabold text-slate-900">ลงเวลาทำงาน</h4>
+                  <p className="text-xs text-slate-500 font-medium">สแกนเข้า-ออกงานประจำวัน</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-sm font-extrabold text-slate-900">ลงเวลาทำงาน</h4>
-                <p className="text-xs text-slate-500 font-medium">สแกนเข้า-ออกงาน</p>
-              </div>
+              <span className="text-slate-400 font-bold text-lg pr-2">›</span>
             </Link>
 
             <Link
               href="/employee/shifts"
-              className="p-4 bg-white rounded-2xl border-2 border-slate-200 shadow-sm hover:border-orange-500 transition flex items-center gap-3.5"
+              className="p-4 bg-white rounded-2xl border-2 border-slate-200 shadow-sm hover:border-orange-500 transition flex items-center justify-between"
             >
-              <div className="w-12 h-12 bg-orange-100 text-orange-700 rounded-2xl flex items-center justify-center text-2xl shrink-0 font-bold shadow-sm">
-                📅
+              <div className="flex items-center gap-4">
+                <div className="w-13 h-13 bg-orange-100 text-orange-700 rounded-2xl flex items-center justify-center text-2xl shrink-0 font-bold shadow-sm">
+                  📅
+                </div>
+                <div>
+                  <h4 className="text-base font-extrabold text-slate-900">ตารางเวร</h4>
+                  <p className="text-xs text-slate-500 font-medium">ตรวจสอบปฏิทินกะการทำงาน</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-sm font-extrabold text-slate-900">ตารางเวร</h4>
-                <p className="text-xs text-slate-500 font-medium">ปฏิทินกะเวร</p>
-              </div>
+              <span className="text-slate-400 font-bold text-lg pr-2">›</span>
             </Link>
 
             <Link
               href="/employee/reports"
-              className="p-4 bg-white rounded-2xl border-2 border-slate-200 shadow-sm hover:border-orange-500 transition flex items-center gap-3.5"
+              className="p-4 bg-white rounded-2xl border-2 border-slate-200 shadow-sm hover:border-orange-500 transition flex items-center justify-between"
             >
-              <div className="w-12 h-12 bg-red-100 text-red-700 rounded-2xl flex items-center justify-center text-2xl shrink-0 font-bold shadow-sm">
-                🛡️
+              <div className="flex items-center gap-4">
+                <div className="w-13 h-13 bg-red-100 text-red-700 rounded-2xl flex items-center justify-center text-2xl shrink-0 font-bold shadow-sm">
+                  🛡️
+                </div>
+                <div>
+                  <h4 className="text-base font-extrabold text-slate-900">แจ้งเหตุการณ์</h4>
+                  <p className="text-xs text-slate-500 font-medium">รายงานสถานการณ์และการตรวจตรา</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-sm font-extrabold text-slate-900">แจ้งเหตุการณ์</h4>
-                <p className="text-xs text-slate-500 font-medium">รายงานตรวจตรา</p>
-              </div>
+              <span className="text-slate-400 font-bold text-lg pr-2">›</span>
             </Link>
 
             <Link
               href="/employee/loans"
-              className="p-4 bg-white rounded-2xl border-2 border-slate-200 shadow-sm hover:border-orange-500 transition flex items-center gap-3.5"
+              className="p-4 bg-white rounded-2xl border-2 border-slate-200 shadow-sm hover:border-orange-500 transition flex items-center justify-between"
             >
-              <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center text-2xl shrink-0 font-bold shadow-sm">
-                💰
+              <div className="flex items-center gap-4">
+                <div className="w-13 h-13 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center text-2xl shrink-0 font-bold shadow-sm">
+                  💰
+                </div>
+                <div>
+                  <h4 className="text-base font-extrabold text-slate-900">ยื่นเรื่องกู้เงิน</h4>
+                  <p className="text-xs text-slate-500 font-medium">สวัสดิการเบิกเงินล่วงหน้าและกู้ยืม</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-sm font-extrabold text-slate-900">ยื่นเรื่องกู้เงิน</h4>
-                <p className="text-xs text-slate-500 font-medium">สวัสดิการกู้ยืม</p>
-              </div>
+              <span className="text-slate-400 font-bold text-lg pr-2">›</span>
             </Link>
 
             <Link
               href="/employee/equipment"
-              className="p-4 bg-white rounded-2xl border-2 border-slate-200 shadow-sm hover:border-orange-500 transition flex items-center gap-3.5"
+              className="p-4 bg-white rounded-2xl border-2 border-slate-200 shadow-sm hover:border-orange-500 transition flex items-center justify-between"
             >
-              <div className="w-12 h-12 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center text-2xl shrink-0 font-bold shadow-sm">
-                📦
+              <div className="flex items-center gap-4">
+                <div className="w-13 h-13 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center text-2xl shrink-0 font-bold shadow-sm">
+                  📦
+                </div>
+                <div>
+                  <h4 className="text-base font-extrabold text-slate-900">เบิกอุปกรณ์</h4>
+                  <p className="text-xs text-slate-500 font-medium">เบิกชุดแต่งกายและเครื่องมือ</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-sm font-extrabold text-slate-900">เบิกอุปกรณ์</h4>
-                <p className="text-xs text-slate-500 font-medium">ชุดแต่งกาย/เครื่องมือ</p>
-              </div>
+              <span className="text-slate-400 font-bold text-lg pr-2">›</span>
             </Link>
           </div>
         </div>
