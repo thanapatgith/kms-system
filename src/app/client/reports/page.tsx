@@ -14,11 +14,13 @@ export default function ClientReportsPage() {
   }, []);
 
   const fetchReportsData = async () => {
+    setLoading(true);
     try {
-      const res = await fetch("/api/client/dashboard");
+      // แก้ไขให้ยิงมาที่ API รายงานโดยตรง
+      const res = await fetch("/api/client/reports");
       const data = await res.json();
       if (data.success) {
-        setClientData(data.client);
+        setClientData({ companyName: "อมตะ" });
         setReports(data.reports || []);
       }
     } catch (err) {
@@ -162,6 +164,20 @@ export default function ClientReportsPage() {
               <div className="text-xs text-slate-700 bg-slate-50 p-3.5 rounded-xl border border-slate-100 leading-relaxed">
                 {rep.content || rep.description || "ไม่มีรายละเอียดเพิ่มเติม"}
               </div>
+
+              {/* ส่วนแสดงรูปภาพแนบ ถ้ามี */}
+              {rep.images && rep.images.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-[11px] font-bold text-slate-600 block">📷 รูปภาพประกอบ:</span>
+                  <div className="grid grid-cols-4 gap-2">
+                    {rep.images.map((imgUrl: string, idx: number) => (
+                      <a key={idx} href={imgUrl} target="_blank" rel="noopener noreferrer" className="aspect-square rounded-xl overflow-hidden border border-slate-200 block">
+                        <img src={imgUrl} alt="report image" className="w-full h-full object-cover hover:scale-105 transition" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* ส่วนคอมเมนต์ */}
               <div className="space-y-3 pt-2">

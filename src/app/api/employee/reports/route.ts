@@ -14,31 +14,35 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: "ไม่ได้เข้าสู่ระบบ" }, { status: 401 });
     }
 
-    const reports = await prisma.incidentReport.findMany({
-      where: { userId: session.userId },
-      orderBy: { createdAt: "desc" },
-    });
+    const reports = (await prisma.$queryRaw`
+      SELECT * FROM incident_reports 
+      WHERE user_id = ${session.userId} 
+      ORDER BY created_at DESC
+    `.catch(() => [])) as any[];
 
-    const formatted = reports.map((item: any) => ({
-      id: item.id,
-      createdAt: item.createdAt,
-      date: new Date(item.createdAt).toLocaleDateString("th-TH", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        timeZone: "Asia/Bangkok",
-      }),
-      time: new Date(item.createdAt).toLocaleTimeString("th-TH", { 
-        hour: "2-digit", 
-        minute: "2-digit",
-        timeZone: "Asia/Bangkok" // ปรับเวลาให้ตรงตามประเทศไทย
-      }),
-      message: item.message,
-      latitude: item.latitude,
-      longitude: item.longitude,
-      location: item.latitude && item.longitude ? `${item.latitude.toFixed(4)}, ${item.longitude.toFixed(4)}` : "-",
-      images: item.images || [],
-    }));
+    const formatted = reports.map((item: any) => {
+      const createdAt = item.created_at || item.createdAt;
+      return {
+        id: item.id,
+        createdAt: createdAt,
+        date: new Date(createdAt).toLocaleDateString("th-TH", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          timeZone: "Asia/Bangkok",
+        }),
+        time: new Date(createdAt).toLocaleTimeString("th-TH", { 
+          hour: "2-digit", 
+          minute: "2-digit",
+          timeZone: "Asia/Bangkok"
+        }),
+        message: item.message,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        location: item.latitude && item.longitude ? `${Number(item.latitude).toFixed(4)}, ${Number(item.longitude).toFixed(4)}` : "-",
+        images: item.images || [],
+      };
+    });
 
     return NextResponse.json({ ok: true, reports: formatted }, {
       headers: {
@@ -61,7 +65,7 @@ export async function POST(req: Request) {
 
     const formData = await req.formData();
     const message = formData.get("message") as string;
-    const branchName = formData.get("branch") as string; // รับชื่อหน่วยงานที่พนักงานเลือก
+    const branchName = formData.get("branch") as string;
     const latitude = formData.get("latitude");
     const longitude = formData.get("longitude");
     const imageFiles = formData.getAll("images") as File[];
@@ -70,19 +74,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "กรุณากรอกข้อความรายงานเหตุการณ์/การตรวจตรา" }, { status: 400 });
     }
 
-    // ค้นหา siteId จากชื่อหน่วยงาน (branchName) ที่เลือก
+    // ค้นหา siteId จากชื่อหน่วยงาน (branchName)
     let targetSiteId: string | null = null;
     if (branchName && branchName !== "หน่วยงานทั่วไป") {
-      const site = await prisma.site.findFirst({
-        where: { siteName: branchName },
-        select: { id: true },
-      });
-      if (site) {
-        targetSiteId = site.id;
+      const sites = (await prisma.$queryRaw`
+        SELECT id FROM sites WHERE site_name = ${branchName} LIMIT 1
+      `.catch(() => [])) as any[];
+      if (sites.length > 0) {
+        targetSiteId = sites[0].id;
       }
     }
 
-    // จัดการอัปโหลดไฟล์รูปภาพขึ้น Supabase Storage (Bucket: reports)
+    // จัดการอัปโหลดไฟล์รูปภาพขึ้น Supabase Storage
     const imageUrls: string[] = [];
     if (imageFiles && imageFiles.length > 0) {
       for (const file of imageFiles) {
@@ -96,22 +99,26 @@ export async function POST(req: Request) {
       }
     }
 
-    // บันทึกลงฐานข้อมูล Prisma พร้อมผูก siteId
-    const newReport = await prisma.incidentReport.create({
-      data: {
-        userId: session.userId,
-        siteId: targetSiteId, // บันทึกรหัสไซต์งานลงไปตรงนี้
-        message: message.trim(),
-        latitude: latitude ? Number(latitude) : null,
-        longitude: longitude ? Number(longitude) : null,
-        images: imageUrls,
-      },
-    });
+    // บันทึกลงฐานข้อมูลด้วย Raw SQL เพื่อหลีกเลี่ยงปัญหา Field Mismatch (siteId vs site_id)
+    await prisma.$queryRaw`
+      INSERT INTO incident_reports (id, user_id, site_id, message, latitude, longitude, images, status, created_at, updated_at)
+      VALUES (
+        gen_random_uuid(),
+        ${session.userId},
+        ${targetSiteId},
+        ${message.trim()},
+        ${latitude ? Number(latitude) : null},
+        ${longitude ? Number(longitude) : null},
+        ${imageUrls}::text[],
+        'PENDING',
+        NOW(),
+        NOW()
+      )
+    `;
 
     return NextResponse.json({
       ok: true,
       message: "ส่งรายงานการตรวจตราสำเร็จ",
-      data: newReport,
     });
   } catch (error: any) {
     console.error("Post report error:", error);

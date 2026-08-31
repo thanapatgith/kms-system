@@ -1,36 +1,42 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
   try {
-    const cookieStore = cookies();
-    const userCookie = cookieStore.get("user")?.value || cookieStore.get("token")?.value;
-
-    const clientRecord = await (prisma as any).clients?.findFirst().catch(() => null);
-    const clientId = clientRecord?.client_id || clientRecord?.id || "fd253584-9eef-47a1-b589-02dfd0ec47e7";
-
-    // ดึงเฉพาะไซต์ที่มี client_id ตรงกับลูกค้ารายนี้ (พร้อมแคสต์ Type เป็น any[])
+    // 1. ดึงไซต์งานทั้งหมดในระบบมาทำ Map ชื่อหน่วยงาน
     const clientSites = (await prisma.$queryRaw`
-      SELECT id, site_name FROM sites WHERE client_id = ${clientId}
+      SELECT id, site_name FROM sites
     `.catch(() => [])) as any[];
 
-    const siteIds = clientSites.map((s: any) => s.id);
-    const siteMap = new Map(clientSites.map((s: any) => [s.id, s.site_name]));
+    const siteMap = new Map();
+    clientSites.forEach((s: any) => {
+      siteMap.set(s.id, s.site_name || s.siteName);
+    });
 
-    let reportsRaw: any[] = [];
-    if (siteIds.length > 0) {
-      reportsRaw = await prisma.logbook.findMany({
-        where: { siteId: { in: siteIds } },
-        orderBy: { createdAt: "desc" },
-      }).catch(() => []);
-    }
+    // 2. ดึงรายงานทั้งหมดจาก incident_reports เรียงจากล่าสุด
+    const reportsRaw = (await prisma.$queryRaw`
+      SELECT * FROM incident_reports 
+      ORDER BY created_at DESC
+    `.catch(() => [])) as any[];
 
-    const reports = reportsRaw.map((r: any) => ({
-      ...r,
-      siteName: siteMap.get(r.siteId) || "หน่วยงานในความดูแล",
-      isAcknowledged: r.status === "ACKNOWLEDGED",
-    }));
+    // 3. แม็ปข้อมูลให้แสดงชื่อหน่วยงานและรายละเอียดถูกต้อง
+    const reports = reportsRaw.map((r: any) => {
+      const siteId = r.site_id || r.siteId;
+      return {
+        id: r.id,
+        title: r.message ? (r.message.length > 40 ? r.message.substring(0, 40) + "..." : r.message) : "รายงานการปฏิบัติงาน",
+        content: r.message,
+        images: r.images || [],
+        latitude: r.latitude,
+        longitude: r.longitude,
+        siteName: siteMap.get(siteId) || "หน่วยงานทั่วไป",
+        isAcknowledged: r.status === "ACKNOWLEDGED",
+        createdAt: r.created_at || r.createdAt,
+      };
+    });
 
     return NextResponse.json({ success: true, reports });
   } catch (error: any) {
