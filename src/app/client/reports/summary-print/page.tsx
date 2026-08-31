@@ -142,7 +142,7 @@ function SummaryPrintContent() {
           <div className="flex items-center gap-3.5">
             <div className="w-12 h-14 rounded-xl flex items-center justify-center overflow-hidden bg-white border border-slate-200 p-1">
               <img 
-                src="https://www.imgz.io/image/gteUE2" 
+                src="https://s.imgz.io/2026/09/01/messageImage_178801711734727d6166eaa767e6f.jpg" 
                 alt="KMS Logo" 
                 className="w-full h-full object-contain"
               />
