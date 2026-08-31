@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function SummaryPrintPage() {
+function SummaryPrintContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
@@ -142,7 +142,7 @@ export default function SummaryPrintPage() {
           <div className="flex items-center gap-3.5">
             <div className="w-12 h-14 rounded-xl flex items-center justify-center overflow-hidden bg-white border border-slate-200 p-1">
               <img 
-                src="https://s.imgz.io/2026/09/01/messageImage_178801711734727d6166eaa767e6f.jpg" 
+                src="https://www.imgz.io/image/gteUE2" 
                 alt="KMS Logo" 
                 className="w-full h-full object-contain"
               />
@@ -248,5 +248,13 @@ export default function SummaryPrintPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function SummaryPrintPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center text-sm text-slate-500">กำลังโหลด...</div>}>
+      <SummaryPrintContent />
+    </Suspense>
   );
 }
