@@ -13,7 +13,6 @@ export default function EmployeeAttendancePage() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // State สำหรับเปิด Custom Camera Modal
   const [showCameraModal, setShowCameraModal] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -67,13 +66,12 @@ export default function EmployeeAttendancePage() {
   const activeRecord = todayRecords.find(item => item.checkIn && item.checkIn !== "-" && (!item.checkOut || item.checkOut === "-"));
   const isWorking = !!activeRecord;
 
-  // เปิดกล้องเบราว์เซอร์
   const startCamera = async () => {
     setErrorMsg("");
     setShowCameraModal(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }, // ใช้กล้องหลัง
+        video: { facingMode: "environment" },
         audio: false,
       });
       setCameraStream(stream);
@@ -87,7 +85,6 @@ export default function EmployeeAttendancePage() {
     }
   };
 
-  // ปิดกล้อง
   const stopCamera = () => {
     if (cameraStream) {
       cameraStream.getTracks().forEach((track) => track.stop());
@@ -95,7 +92,6 @@ export default function EmployeeAttendancePage() {
     }
   };
 
-  // กดถ่ายรูปจากวิดีโอ
   const capturePhoto = () => {
     if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
@@ -240,7 +236,7 @@ export default function EmployeeAttendancePage() {
                     กดเพื่อเปิดกล้องถ่ายภาพผู้มารับช่วงต่อ
                   </p>
                   <p className="text-[10px] text-slate-400 mt-0.5">
-                    แตะเพื่อเริ่มใช้งานกล้องบนหน้าเว็บ
+                    แตะเพื่อเริ่มใช้งานกล้องตามรูปแบบไกด์ไลน์ครึ่งตัว
                   </p>
                 </div>
               </div>
@@ -277,7 +273,7 @@ export default function EmployeeAttendancePage() {
         </div>
       </main>
 
-      {/* Modal เปิดกล้องสดพร้อมเส้นไกด์ไลน์ (Dashed Wireframe Guide) */}
+      {/* Modal เปิดกล้องสดพร้อมเส้นไกด์ไลน์รูปคนครึ่งตัวตามที่คุณวาด */}
       {showCameraModal && (
         <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-between p-4">
           <div className="w-full flex justify-between items-center text-white py-2">
@@ -293,7 +289,7 @@ export default function EmployeeAttendancePage() {
             </button>
           </div>
 
-          {/* ช่องแสดงวิดีโอกล้องสดพร้อมเส้นประไกด์ไลน์ */}
+          {/* ช่องแสดงวิดีโอกล้องสดพร้อมเส้นไกด์ไลน์รูปคนครึ่งตัว */}
           <div className="relative flex-1 w-full max-w-md flex items-center justify-center overflow-hidden rounded-2xl bg-black my-2">
             <video
               ref={videoRef}
@@ -303,12 +299,23 @@ export default function EmployeeAttendancePage() {
               className="absolute inset-0 w-full h-full object-cover"
             ></video>
 
-            {/* เส้นไกด์ไลน์โครงร่าง (Dashed Wireframe Guide) */}
-            <div className="absolute inset-8 border-2 border-dashed border-white/70 rounded-3xl pointer-events-none flex flex-col items-center justify-center">
-              <div className="w-24 h-32 border-2 border-dashed border-emerald-400 rounded-t-full mb-2 opacity-90"></div>
-              <span className="bg-black/60 text-emerald-300 text-[10px] font-bold px-3 py-1 rounded-full border border-emerald-500/50">
+            {/* กรอบสี่เหลี่ยมทึบด้านนอก */}
+            <div className="absolute inset-10 border-2 border-white rounded-2xl pointer-events-none flex flex-col items-center justify-center bg-black/10">
+              
+              {/* เส้นโครงร่างคนครึ่งตัว (SVG Half-body Wireframe) แบบเส้นประ */}
+              <div className="relative w-36 h-48 mb-4 flex items-center justify-center">
+                <svg className="w-full h-full text-emerald-400 opacity-90" viewBox="0 0 100 130" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4">
+                  {/* ศีรษะ */}
+                  <ellipse cx="50" cy="25" rx="18" ry="22" />
+                  {/* หัวไหล่และลำตัวครึ่งบน */}
+                  <path d="M 18 115 C 18 75, 32 60, 50 60 C 68 60, 82 75, 82 115" />
+                </svg>
+              </div>
+
+              {/* แถบข้อความคำแนะนำด้านล่าง */}
+              <div className="bg-emerald-800/85 text-emerald-100 text-[11px] font-bold px-4 py-1.5 rounded-full border border-emerald-400 shadow-lg">
                 กรุณาจัดตำแหน่งให้อยู่ในกรอบ
-              </span>
+              </div>
             </div>
           </div>
 
