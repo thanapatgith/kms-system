@@ -8,8 +8,8 @@ export default function EmployeeAttendanceHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [activePreset, setActivePreset] = useState("all");
   
-  // เปลี่ยนเป็นเก็บอาเรย์ของรูปภาพทั้งหมดที่จะแสดงใน Modal
   const [activeImagesModal, setActiveImagesModal] = useState<string[] | null>(null);
 
   useEffect(() => {
@@ -28,6 +28,31 @@ export default function EmployeeAttendanceHistoryPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ฟังก์ชันตั้งค่าปุ่มตัวกรองลัด (Presets)
+  const handlePresetFilter = (preset: string) => {
+    setActivePreset(preset);
+    const now = new Date();
+    
+    if (preset === "all") {
+      setStartDate("");
+      setEndDate("");
+    } else if (preset === "7days") {
+      const pastDate = new Date();
+      pastDate.setDate(now.getDate() - 7);
+      setStartDate(pastDate.toISOString().split("T")[0]);
+      setEndDate(now.toISOString().split("T")[0]);
+    } else if (preset === "thisMonth") {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      setStartDate(firstDay.toISOString().split("T")[0]);
+      setEndDate(now.toISOString().split("T")[0]);
+    } else if (preset === "lastMonth") {
+      const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+      setStartDate(firstDayLastMonth.toISOString().split("T")[0]);
+      setEndDate(lastDayLastMonth.toISOString().split("T")[0]);
     }
   };
 
@@ -61,16 +86,46 @@ export default function EmployeeAttendanceHistoryPage() {
       {/* Main Content */}
       <main className="max-w-md mx-auto px-4 mt-4 space-y-3">
         
-        {/* ตัวกรองช่วงวันที่ */}
-        <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 space-y-2">
-          <span className="text-xs font-bold text-slate-800 block">📅 กรองประวัติการทำงานตามช่วงเวลา</span>
-          <div className="grid grid-cols-2 gap-2">
+        {/* ตัวกรองช่วงเวลาแบบปุ่มลัดและเลือกวันที่ */}
+        <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+          <span className="text-xs font-bold text-slate-800 block">📅 ตัวกรองประวัติการทำงาน</span>
+          
+          {/* ปุ่มตัวกรองลัด (Presets) */}
+          <div className="grid grid-cols-4 gap-1.5">
+            <button
+              onClick={() => handlePresetFilter("all")}
+              className={`py-1.5 text-[11px] font-bold rounded-xl transition ${activePreset === "all" ? "bg-orange-600 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+            >
+              ทั้งหมด
+            </button>
+            <button
+              onClick={() => handlePresetFilter("7days")}
+              className={`py-1.5 text-[11px] font-bold rounded-xl transition ${activePreset === "7days" ? "bg-orange-600 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+            >
+              7 วันล่าสุด
+            </button>
+            <button
+              onClick={() => handlePresetFilter("thisMonth")}
+              className={`py-1.5 text-[11px] font-bold rounded-xl transition ${activePreset === "thisMonth" ? "bg-orange-600 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+            >
+              เดือนนี้
+            </button>
+            <button
+              onClick={() => handlePresetFilter("lastMonth")}
+              className={`py-1.5 text-[11px] font-bold rounded-xl transition ${activePreset === "lastMonth" ? "bg-orange-600 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+            >
+              เดือนก่อน
+            </button>
+          </div>
+
+          {/* เลือกช่วงวันที่แบบกำหนดเอง */}
+          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
             <div>
               <label className="text-[10px] text-slate-600 block mb-0.5 font-semibold">จากวันที่</label>
               <input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => { setStartDate(e.target.value); setActivePreset("custom"); }}
                 className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-slate-900 font-semibold focus:outline-none focus:border-amber-500 font-mono"
               />
             </div>
@@ -79,19 +134,11 @@ export default function EmployeeAttendanceHistoryPage() {
               <input
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(e) => { setEndDate(e.target.value); setActivePreset("custom"); }}
                 className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-slate-900 font-semibold focus:outline-none focus:border-amber-500 font-mono"
               />
             </div>
           </div>
-          {(startDate || endDate) && (
-            <button
-              onClick={() => { setStartDate(""); setEndDate(""); }}
-              className="w-full py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[11px] font-bold transition mt-1"
-            >
-              🔄 ล้างตัวกรองวันที่
-            </button>
-          )}
         </div>
 
         {loading ? (
@@ -104,14 +151,19 @@ export default function EmployeeAttendanceHistoryPage() {
           filteredHistory.map((item, index) => (
             <div key={index} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
               <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                <span className="font-bold text-slate-900 text-sm">{item.date}</span>
+                <div>
+                  <span className="font-bold text-slate-900 text-sm block">{item.date}</span>
+                  <span className="text-[11px] font-semibold text-orange-600 flex items-center gap-1 mt-0.5">
+                    🏢 หน่วยงาน: {item.branchName || item.siteName || item.branch || "สำนักงานใหญ่"}
+                  </span>
+                </div>
                 <span className="px-2.5 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-full">
                   รอบที่ {filteredHistory.length - index}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
-                {/* ข้อมูลเข้างาน + ส่งอาเรย์รูปทั้งหมดเข้าไป */}
+                {/* ข้อมูลเข้างาน */}
                 <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
                   <div>
                     <span className="text-slate-600 block text-[10px] font-semibold">เวลาเข้างาน</span>
@@ -130,7 +182,7 @@ export default function EmployeeAttendanceHistoryPage() {
                   )}
                 </div>
 
-                {/* ข้อมูลออกงาน + ส่งอาเรย์รูปทั้งหมดเข้าไป */}
+                {/* ข้อมูลออกงาน */}
                 <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
                   <div>
                     <span className="text-slate-600 block text-[10px] font-semibold">เวลาออกงาน</span>
@@ -154,7 +206,7 @@ export default function EmployeeAttendanceHistoryPage() {
         )}
       </main>
 
-      {/* Modal แสดงรูปภาพทั้งหมดในรอบนั้นๆ แบบเลื่อนดูได้ */}
+      {/* Modal แสดงรูปภาพทั้งหมด */}
       {activeImagesModal && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="relative max-w-sm w-full bg-white rounded-2xl overflow-hidden p-3 space-y-3 shadow-2xl max-h-[85vh] flex flex-col">
@@ -168,7 +220,6 @@ export default function EmployeeAttendanceHistoryPage() {
               </button>
             </div>
             
-            {/* แสดงรูปเรียงลงมาทั้งหมด หากมีหลายรูปจะสามารถเลื่อนดูได้ */}
             <div className="overflow-y-auto space-y-2 pr-1">
               {activeImagesModal.map((imgSrc, imgIdx) => (
                 <div key={imgIdx} className="w-full aspect-square rounded-xl overflow-hidden bg-slate-900 border border-slate-200 relative">

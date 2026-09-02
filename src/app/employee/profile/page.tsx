@@ -16,11 +16,11 @@ export default function EmployeeProfilePage() {
   const [leavesCount, setLeavesCount] = useState(0);
 
   const [showNotiModal, setShowNotiModal] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
     fetchProfileData();
+    fetchNotifications();
   }, []);
 
   const fetchProfileData = async () => {
@@ -45,20 +45,45 @@ export default function EmployeeProfilePage() {
     }
   };
 
+  // ดึงข้อมูลการแจ้งเตือนจาก API ที่สร้างขึ้น
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch("/api/employee/notifications");
+      const data = await res.json();
+      if (data.ok) {
+        setNotifications(data.notifications || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
+    }
+  };
+
+  // ฟังก์ชันอัปเดตสถานะเมื่อกดอ่านแจ้งเตือนแล้ว
+  const markAsRead = async (id: string) => {
+    try {
+      await fetch("/api/employee/notifications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      fetchNotifications();
+    } catch (err) {
+      console.error("Failed to mark as read:", err);
+    }
+  };
+
   const dailyWage = Math.round(profile?.dailyRate || 520);
   const workedDays = profile?.workedDays || 20;
   const grossEarnings = Math.round(profile?.grossIncome || (workedDays * dailyWage));
   const totalDeduction = Math.round(profile?.totalDeductions || 0);
   
   const netSalaryPayable = Math.round((profile?.netSalary || grossEarnings) - totalDeduction);
-
-  const baseWage8Hrs = profile?.baseWage8Hrs || (dailyWage > 400 ? 400 : Math.round(dailyWage * 0.77));
-  const otRate = profile?.otRate || (dailyWage - baseWage8Hrs);
-
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  
+  // นับจำนวนที่ยังไม่ได้อ่าน (is_read เป็น false)
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
-    <div className="w-full min-h-screen bg-slate-100 pb-32 text-base">
+    <div className="w-full min-h-screen bg-slate-100 pb-32 text-base font-sans">
       {/* Header */}
       <header className="bg-slate-900 text-white shadow-md sticky top-0 z-50 border-b border-slate-800">
         <div className="max-w-md mx-auto px-4 py-4 flex justify-between items-center">
@@ -70,13 +95,13 @@ export default function EmployeeProfilePage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowProfileModal(true)}
+            <Link
+              href="/employee/settings"
               className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl text-sm font-bold transition flex items-center gap-1.5 shadow border border-slate-700 cursor-pointer"
             >
               <span className="text-base">👤</span>
               <span className="max-w-[100px] truncate">{profile?.name || "ส่วนตัว"}</span>
-            </button>
+            </Link>
 
             <button
               onClick={() => setShowNotiModal(true)}
@@ -113,7 +138,6 @@ export default function EmployeeProfilePage() {
           </div>
 
           <div className="bg-slate-800/95 p-5 rounded-2xl border border-slate-700/80 space-y-4 shadow-inner">
-            {/* จัดข้อความชิดซ้าย และตัวเลขชิดขวาอย่างสมดุล ไม่ติดขอบ */}
             <div className="flex justify-between items-end px-1">
               <span className="text-xs text-slate-300 font-bold pb-1">
                 💰 สุทธิคาดว่าจะได้รับเข้าบัญชี:
@@ -123,7 +147,6 @@ export default function EmployeeProfilePage() {
               </span>
             </div>
 
-            {/* เพิ่ม padding และช่องไฟให้กล่องย่อยไม่ติดขอบ */}
             <div className="grid grid-cols-3 gap-3 pt-3 border-t border-slate-700/80 text-center font-mono">
               <div className="bg-slate-900/90 py-3 px-2 rounded-2xl border border-slate-800 shadow-sm">
                 <span className="block text-xs font-sans text-slate-400 font-medium mb-1">ทำแล้ว</span>
@@ -166,7 +189,7 @@ export default function EmployeeProfilePage() {
           </Link>
         </div>
 
-        {/* เมนูลัดบริการพนักงาน - ปรับเป็น 1 คอลัมน์เพื่อให้ปุ่มใหญ่และกดง่ายสำหรับผู้สูงอายุ */}
+        {/* เมนูลัดบริการพนักงาน */}
         <div className="space-y-3">
           <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2 px-1">
             <span>⚡</span>
@@ -253,90 +276,12 @@ export default function EmployeeProfilePage() {
               </div>
               <span className="text-slate-400 font-bold text-lg pr-2">›</span>
             </Link>
-
-            <Link
-              href="/employee/equipment"
-              className="p-4 bg-white rounded-2xl border-2 border-slate-200 shadow-sm hover:border-orange-500 transition flex items-center justify-between"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-13 h-13 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center text-2xl shrink-0 font-bold shadow-sm">
-                  📦
-                </div>
-                <div>
-                  <h4 className="text-base font-extrabold text-slate-900">เบิกอุปกรณ์</h4>
-                  <p className="text-xs text-slate-500 font-medium">เบิกชุดแต่งกายและเครื่องมือ</p>
-                </div>
-              </div>
-              <span className="text-slate-400 font-bold text-lg pr-2">›</span>
-            </Link>
           </div>
         </div>
 
       </main>
 
-      {/* Modal ข้อมูลส่วนตัว */}
-      {showProfileModal && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-4 border border-slate-200 my-auto">
-            <div className="flex justify-between items-center border-b pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">👤</span>
-                <h3 className="text-base font-bold text-slate-900">ข้อมูลส่วนตัวพนักงาน</h3>
-              </div>
-              <button
-                onClick={() => setShowProfileModal(false)}
-                className="text-slate-400 hover:text-slate-600 font-extrabold text-lg cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3.5 text-sm text-slate-700">
-              <div className="flex justify-between pb-2 border-b border-slate-100">
-                <span className="font-semibold text-slate-500">ชื่อ-นามสกุล:</span>
-                <span className="font-bold text-slate-900">{profile?.name || "-"}</span>
-              </div>
-              <div className="flex justify-between pb-2 border-b border-slate-100">
-                <span className="font-semibold text-slate-500">รหัสพนักงาน:</span>
-                <span className="font-mono font-bold text-slate-900">{profile?.employeeCode || "-"}</span>
-              </div>
-              <div className="flex justify-between pb-2 border-b border-slate-100">
-                <span className="font-semibold text-slate-500">เลขบัตรประชาชน:</span>
-                <span className="font-mono font-bold text-slate-900">{profile?.idCard || "-"}</span>
-              </div>
-              <div className="flex justify-between pb-2 border-b border-slate-100">
-                <span className="font-semibold text-slate-500">เบอร์โทรศัพท์:</span>
-                <span className="font-mono font-bold text-slate-900">{profile?.phone || "-"}</span>
-              </div>
-              <div className="flex justify-between items-start pb-2 border-b border-slate-100">
-                <span className="font-semibold text-slate-500">อัตราค่าจ้าง:</span>
-                <div className="text-right">
-                  <span className="font-mono font-bold text-emerald-700 block text-base">฿{dailyWage}/วัน</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-2 flex gap-3">
-              <button
-                type="button"
-                onClick={() => router.push("/login")}
-                className="w-1/2 py-3 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 font-bold text-xs rounded-xl transition cursor-pointer"
-              >
-                🚪 ออกจากระบบ
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowProfileModal(false)}
-                className="w-1/2 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer"
-              >
-                ปิดหน้าต่าง
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Notification */}
+      {/* Modal Notification (เชื่อมต่อข้อมูลจริง) */}
       {showNotiModal && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200 max-h-[80vh] flex flex-col">
@@ -350,17 +295,26 @@ export default function EmployeeProfilePage() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-3 text-sm">
+            <div className="flex-1 overflow-y-auto space-y-3 text-sm pr-1">
               {notifications.length === 0 ? (
                 <div className="text-center py-10 text-slate-400 font-medium">ไม่มีการแจ้งเตือนใหม่</div>
               ) : (
                 notifications.map((item) => (
-                  <div key={item.id} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div 
+                    key={item.id} 
+                    onClick={() => !item.is_read && markAsRead(item.id)}
+                    className={`p-3.5 rounded-2xl border transition cursor-pointer ${item.is_read ? 'bg-white border-slate-200 text-slate-600' : 'bg-blue-50/80 border-blue-200 text-slate-900 font-medium shadow-sm'}`}
+                  >
                     <div className="flex justify-between items-start mb-1">
-                      <span className="font-bold text-slate-900 text-sm">{item.title}</span>
-                      <span className="text-xs text-slate-400 font-mono">{item.time}</span>
+                      <span className="font-bold text-sm flex items-center gap-1.5">
+                        {!item.is_read && <span className="w-2 h-2 rounded-full bg-blue-600 inline-block"></span>}
+                        {item.title}
+                      </span>
+                      <span className="text-xs text-slate-400 font-mono">
+                        {new Date(item.created_at).toLocaleDateString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
                     </div>
-                    <p className="text-xs text-slate-600 leading-relaxed">{item.message}</p>
+                    <p className="text-xs leading-relaxed opacity-90">{item.message}</p>
                   </div>
                 ))
               )}
@@ -376,7 +330,7 @@ export default function EmployeeProfilePage() {
         </div>
       )}
 
-      {/* Bottom Navigation Bar - ปรับให้สว่าง ตัวหนังสือใหญ่ และเด่นชัดขึ้นมาก */}
+      {/* Bottom Navigation Bar */}
       <nav className="fixed bottom-0 left-0 right-0 bg-slate-950 border-t-2 border-slate-800 px-3 py-3 flex justify-around items-center z-50 shadow-2xl">
         <Link href="/employee/profile" className="flex flex-col items-center text-orange-400 text-xs font-black transition scale-105">
           <span className="text-2xl mb-1">👤</span>

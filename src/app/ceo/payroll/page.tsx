@@ -17,7 +17,7 @@ interface PayrollItem {
   social_security: number;
   tax_withholding: number;
   total_deductions: number;
-  net_salary: number;
+  net_salary: number; 
   billing_period: string;
 }
 

@@ -11,51 +11,67 @@ const supabaseAdmin = createClient(
 
 export async function GET() {
   try {
-    // 1. ดึงรายชื่อพนักงานทั้งหมดจาก users มาทำ Dictionary ดึงชื่อ
-    const { data: usersData } = await supabaseAdmin.from("users").select("id, name");
+    // 1. ดึงรายชื่อพนักงานทั้งหมด (รวม site_id) จาก users
+    const { data: usersData } = await supabaseAdmin.from("users").select("id, name, employee_code, site_id");
     
-    // สร้าง Map ให้ค้นหาชื่อจาก ID (รองรับทั้ง id และ user_id)
-    const userMap = new Map<string, string>();
-    (usersData || []).forEach((u: any) => {
-      if (u.id) userMap.set(u.id, u.name);
+    // 2. ดึงรายชื่อหน่วยงานทั้งหมดจาก sites มาทำ Map
+    const { data: sitesData } = await supabaseAdmin.from("sites").select("id, site_name");
+    const siteMap = new Map<string, string>();
+    (sitesData || []).forEach((s: any) => {
+      if (s.id) siteMap.set(s.id, s.site_name);
     });
 
-    // 2. ดึงคำร้องเบิกเงิน
+    // สร้าง Map เก็บข้อมูลพนักงาน (ชื่อ, รหัส, ชื่อหน่วยงาน)
+    const userMap = new Map<string, { name: string; employee_code: string; site_name: string }>();
+    (usersData || []).forEach((u: any) => {
+      if (u.id) {
+        const siteName = u.site_id ? siteMap.get(u.site_id) || "สำนักงานใหญ่" : "สำนักงานใหญ่";
+        userMap.set(u.id, {
+          name: u.name || "ไม่ระบุชื่อ",
+          employee_code: u.employee_code || "KMS-EMP",
+          site_name: siteName,
+        });
+      }
+    });
+
+    // 3. ดึงคำร้องเบิกเงิน
     const { data: loans } = await supabaseAdmin
       .from("loan_requests")
       .select("*")
       .order("created_at", { ascending: false });
 
-    // 3. ดึงคำร้องขอลา
+    // 4. ดึงคำร้องขอลา
     const { data: leaves } = await supabaseAdmin
       .from("leave_requests")
       .select("*")
       .order("created_at", { ascending: false });
 
-    // 4. ดึงคำร้องเบิกอุปกรณ์
+    // 5. ดึงคำร้องเบิกอุปกรณ์
     const { data: equipments } = await supabaseAdmin
       .from("equipment_requests")
       .select("*")
       .order("created_at", { ascending: false });
 
-    // ฟังก์ชันช่วยหาชื่อจริง
-    const mapName = (list: any[]) =>
+    // ฟังก์ชันช่วยแมปข้อมูลพนักงานและหน่วยงาน
+    const mapUserData = (list: any[]) =>
       (list || []).map((item) => {
-        const uid = item.user_id || item.employee_id || item.applicant_id || item.id;
-        const foundName = userMap.get(uid) || item.employee_name || item.applicant_name;
-        
+        const uid = item.user_id || item.employee_id || item.applicant_id;
+        const userInfo = userMap.get(uid);
+
         return {
           ...item,
-          employee_name: foundName && foundName !== uid ? foundName : `พนักงาน (${item.user_id || uid || "ไม่ระบุ"})`,
+          employee_name: userInfo?.name || item.employee_name || item.applicant_name || "พนักงาน",
+          employee_code: userInfo?.employee_code || item.employee_code || "KMS-EMP",
+          site_name: userInfo?.site_name || item.site_name || "สำนักงานใหญ่",
         };
       });
 
     return NextResponse.json(
       {
         ok: true,
-        loans: mapName(loans || []),
-        leaves: mapName(leaves || []),
-        equipments: mapName(equipments || []),
+        loans: mapUserData(loans || []),
+        leaves: mapUserData(leaves || []),
+        equipments: mapUserData(equipments || []),
       },
       {
         headers: {

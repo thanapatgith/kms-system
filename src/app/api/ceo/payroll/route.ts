@@ -12,23 +12,13 @@ const supabaseAdmin = createClient(
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const period = searchParams.get("period") || "2026-07"; // เช่น "2026-07"
+    const period = searchParams.get("period") || "2026-09"; // เช่น "2026-09"
 
-    // แยกปีและเดือนจากค่าที่ส่งมา (เช่น "2026-07" -> year = "2026", month = "07" หรือ "7")
-    const [year, monthStr] = period.split("-");
-    const monthNum = monthStr ? parseInt(monthStr, 10).toString() : ""; // แปลง "07" เป็น "7" เพื่อรองรับรูปแบบ "1/7/2026"
-
-    // สร้างรูปแบบที่เป็นไปได้ทั้งหมดที่อาจจะถูกเก็บใน DB
-    const pattern1 = period;                 // เช่น "2026-07"
-    const pattern2 = `${monthNum}/${monthStr}/${year}`; // เช่น "7/07/2026" หรือแบบมีเลข 0
-    const pattern3 = `1/${monthNum}/${year}`;  // เช่น "1/7/2026"
-    const pattern4 = `${year}/${monthStr}`;    // เช่น "2026/07"
-
-    // ดึงข้อมูลโดยใช้เงื่อนไข .or() ให้ครอบคลุมทุกรูปแบบที่เป็นไปได้
+    // ค้นหาข้อมูลจากตาราง payrolls โดยอิงตามฟิลด์ month ที่เก็บค่า "2026-09"
     const { data, error } = await supabaseAdmin
       .from("payrolls")
       .select("*")
-      .or(`billing_period.eq.${pattern1},billing_period.eq.${pattern2},billing_period.eq.${pattern3},billing_period.eq.${pattern4}`)
+      .eq("month", period)
       .order("created_at", { ascending: true });
 
     if (error) {
@@ -36,12 +26,31 @@ export async function GET(request: Request) {
       throw error;
     }
 
+    // แมปข้อมูลให้ตรงกับ Interface ที่หน้าบ้าน (CEOPayrollPage) ต้องการ
+    const formattedData = (data || []).map((item: any) => ({
+      id: item.id,
+      user_id: item.user_id || "-",
+      employee_code: item.employee_code || "KMS-EMP",
+      employee_name: item.employee_name || "ไม่ระบุชื่อ",
+      gender: item.gender || "MALE",
+      site_name: item.site_name || "สำนักงานใหญ่",
+      status: item.status || "PENDING",
+      work_days: item.work_days || 30,
+      gross_income: Number(item.gross_income || item.base_salary || 0),
+      total_advance: Number(item.total_advance || 0),
+      social_security: Number(item.social_security || 0),
+      tax_withholding: Number(item.tax_withholding || 0),
+      total_deductions: Number(item.total_deductions || item.deductions || 0),
+      net_salary: Number(item.net_salary || 0),
+      billing_period: item.month || period,
+    }));
+
     return NextResponse.json(
       {
         ok: true,
         period,
-        count: data?.length || 0,
-        data: data || [],
+        count: formattedData.length,
+        data: formattedData,
       },
       {
         headers: {

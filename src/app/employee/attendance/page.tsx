@@ -71,7 +71,11 @@ export default function EmployeeAttendancePage() {
     setShowCameraModal(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: { 
+          facingMode: "environment",
+          width: { ideal: 768 },
+          height: { ideal: 1024 }
+        },
         audio: false,
       });
       setCameraStream(stream);
@@ -97,11 +101,30 @@ export default function EmployeeAttendancePage() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    const targetWidth = 600;
+    const targetHeight = 800;
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
     const ctx = canvas.getContext("2d");
     if (ctx) {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const videoRatio = video.videoWidth / video.videoHeight;
+      const targetRatio = targetWidth / targetHeight;
+      let renderWidth = video.videoWidth;
+      let renderHeight = video.videoHeight;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (videoRatio > targetRatio) {
+        renderWidth = video.videoHeight * targetRatio;
+        offsetX = (video.videoWidth - renderWidth) / 2;
+      } else {
+        renderHeight = video.videoWidth / targetRatio;
+        offsetY = (video.videoHeight - renderHeight) / 2;
+      }
+
+      ctx.drawImage(video, offsetX, offsetY, renderWidth, renderHeight, 0, 0, targetWidth, targetHeight);
+
       canvas.toBlob((blob) => {
         if (blob) {
           const file = new File([blob], `attendance_${Date.now()}.jpg`, { type: "image/jpeg" });
@@ -236,16 +259,16 @@ export default function EmployeeAttendancePage() {
                     กดเพื่อเปิดกล้องถ่ายภาพผู้มารับช่วงต่อ
                   </p>
                   <p className="text-[10px] text-slate-400 mt-0.5">
-                    แตะเพื่อเริ่มใช้งานกล้องตามรูปแบบไกด์ไลน์ครึ่งตัว
+                    แตะเพื่อเริ่มใช้งานกล้อง (แนวตั้ง 3:4)
                   </p>
                 </div>
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden border-2 border-emerald-500 shadow-md bg-slate-900">
+                <div className="relative w-36 mx-auto aspect-[3/4] rounded-2xl overflow-hidden border-2 border-emerald-500 shadow-md bg-slate-900">
                   <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                  <div className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow">
-                    ✓ ถ่ายภาพสำเร็จ
+                  <div className="absolute top-1 right-1 bg-emerald-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow">
+                    ✓ สำเร็จ
                   </div>
                 </div>
                 <button
@@ -273,24 +296,24 @@ export default function EmployeeAttendancePage() {
         </div>
       </main>
 
-      {/* Modal เปิดกล้องสดพร้อมเส้นไกด์ไลน์รูปคนครึ่งตัวตามที่คุณวาด */}
+      {/* Modal เปิดกล้องสด ล็อกสัดส่วน 3:4 แท้แน่นอน */}
       {showCameraModal && (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-between p-4">
-          <div className="w-full flex justify-between items-center text-white py-2">
-            <span className="text-xs font-bold">📷 จัดตำแหน่งผู้มารับช่วงต่อให้อยู่ในกรอบ</span>
+        <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-between p-4 pb-24">
+          <div className="w-full flex justify-between items-center text-white py-1">
+            <span className="text-xs font-bold">📷 จัดตำแหน่งผู้มารับช่วงต่อให้อยู่ในกรอบ (3:4)</span>
             <button
               onClick={() => {
                 stopCamera();
                 setShowCameraModal(false);
               }}
-              className="text-white bg-slate-800 hover:bg-slate-700 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm"
+              className="text-white bg-slate-800 hover:bg-slate-700 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm"
             >
               ✕
             </button>
           </div>
 
-          {/* ช่องแสดงวิดีโอกล้องสดพร้อมเส้นไกด์ไลน์รูปคนครึ่งตัว */}
-          <div className="relative flex-1 w-full max-w-md flex items-center justify-center overflow-hidden rounded-2xl bg-black my-2">
+          {/* ช่องแสดงวิดีโอกล้องสด ล็อกสัดส่วน 3:4 เป๊ะๆ ด้วย aspect-[3/4] */}
+          <div className="relative w-full max-w-[280px] aspect-[3/4] flex items-center justify-center overflow-hidden rounded-2xl bg-black my-auto shadow-2xl border border-slate-700">
             <video
               ref={videoRef}
               autoPlay
@@ -299,11 +322,11 @@ export default function EmployeeAttendancePage() {
               className="absolute inset-0 w-full h-full object-cover"
             ></video>
 
-            {/* กรอบสี่เหลี่ยมทึบด้านนอก */}
-            <div className="absolute inset-10 border-2 border-white rounded-2xl pointer-events-none flex flex-col items-center justify-center bg-black/10">
+            {/* กรอบสี่เหลี่ยมไกด์ไลน์ 3:4 */}
+            <div className="absolute inset-4 border-2 border-white/80 rounded-xl pointer-events-none flex flex-col items-center justify-center bg-black/10">
               
-              {/* เส้นโครงร่างคนครึ่งตัว (SVG Half-body Wireframe) แบบเส้นประ */}
-              <div className="relative w-36 h-48 mb-4 flex items-center justify-center">
+              {/* เส้นโครงร่างคนครึ่งตัว (SVG Half-body Wireframe) */}
+              <div className="relative w-24 h-36 mb-2 flex items-center justify-center">
                 <svg className="w-full h-full text-emerald-400 opacity-90" viewBox="0 0 100 130" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4">
                   {/* ศีรษะ */}
                   <ellipse cx="50" cy="25" rx="18" ry="22" />
@@ -313,7 +336,7 @@ export default function EmployeeAttendancePage() {
               </div>
 
               {/* แถบข้อความคำแนะนำด้านล่าง */}
-              <div className="bg-emerald-800/85 text-emerald-100 text-[11px] font-bold px-4 py-1.5 rounded-full border border-emerald-400 shadow-lg">
+              <div className="bg-emerald-800/85 text-emerald-100 text-[10px] font-bold px-3 py-1 rounded-full border border-emerald-400 shadow-lg">
                 กรุณาจัดตำแหน่งให้อยู่ในกรอบ
               </div>
             </div>
@@ -321,11 +344,11 @@ export default function EmployeeAttendancePage() {
 
           <canvas ref={canvasRef} className="hidden"></canvas>
 
-          {/* ปุ่มชัตเตอร์ถ่ายรูป */}
-          <div className="w-full max-w-md py-4 flex justify-center items-center">
+          {/* ปุ่มชัตเตอร์ถ่ายรูป (ขยับขึ้นมาด้านบนพ้นแถบเมนูด้านล่าง) */}
+          <div className="w-full max-w-md pb-2 flex justify-center items-center">
             <button
               onClick={capturePhoto}
-              className="w-16 h-16 rounded-full bg-white border-4 border-slate-300 shadow-xl flex items-center justify-center active:scale-95 transition cursor-pointer"
+              className="w-16 h-16 rounded-full bg-white border-4 border-slate-300 shadow-2xl flex items-center justify-center active:scale-95 transition cursor-pointer"
             >
               <div className="w-12 h-12 rounded-full bg-orange-600"></div>
             </button>
@@ -366,11 +389,11 @@ export default function EmployeeAttendancePage() {
 
       {/* Bottom Navigation Bar */}
       <nav className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-2 py-2 flex justify-around items-center z-50 shadow-lg">
-        <Link href="/employee/profile" className="flex flex-col items-center text-orange-400 text-[10px] font-semibold transition">
+        <Link href="/employee/profile" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
           <span className="text-base mb-0.5">👤</span>
           หน้าแรก
         </Link>
-        <Link href="/employee/attendance" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
+        <Link href="/employee/attendance" className="flex flex-col items-center text-orange-400 text-[10px] font-semibold transition">
           <span className="text-base mb-0.5">⏱️</span>
           ลงเวลาทำงาน
         </Link>

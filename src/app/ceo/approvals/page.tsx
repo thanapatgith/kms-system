@@ -6,8 +6,10 @@ import Link from "next/link";
 interface RequestItem {
   id: string;
   user_id?: string;
+  employee_code?: string;
   employee_name?: string;
   applicant_name?: string;
+  site_name?: string;
   amount?: number;
   reason?: string;
   leave_type?: string;
@@ -44,6 +46,28 @@ function generateMonthOptions() {
     options.push({ value, label });
   }
   return options;
+}
+
+// ฟังก์ชันแปลงวันที่เป็นรูปแบบไทย
+function formatThaiDateTime(dateString?: string) {
+  if (!dateString) return "-";
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+
+    const day = date.getDate();
+    const monthNamesTH = [
+      "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+      "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
+    ];
+    const month = monthNamesTH[date.getMonth()];
+    const year = date.getFullYear() + 543;
+    const time = date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+
+    return `${day} ${month} ${year} (${time} น.)`;
+  } catch {
+    return dateString;
+  }
 }
 
 export default function CEOApprovalsPage() {
@@ -130,13 +154,11 @@ export default function CEOApprovalsPage() {
     const matchesStatus = activeTab === "all" || itemStatus === activeTab;
     const matchesCategory = categoryFilter === "all" || item.type === categoryFilter;
 
-    // 1. กรองตามงวดเดือนหลัก (YYYY-MM)
     let matchesMonth = true;
     if (item.created_at) {
       matchesMonth = item.created_at.substring(0, 7) === selectedMonth;
     }
 
-    // 2. กรองย่อยตามช่วงเวลา
     let matchesSubDate = true;
     if (item.created_at) {
       const itemDate = new Date(item.created_at);
@@ -186,7 +208,7 @@ export default function CEOApprovalsPage() {
 
       {/* Main Content */}
       <main className="max-w-md mx-auto px-4 mt-3 space-y-3">
-        {/* ตัวกรองด้านล่าง 3 ช่อง */}
+        {/* ตัวกรอง 3 ช่อง */}
         <div className="grid grid-cols-3 gap-1.5 text-xs font-bold">
           <div className="flex flex-col gap-1">
             <label className="text-[10px] text-slate-500 font-medium">สถานะ</label>
@@ -231,7 +253,6 @@ export default function CEOApprovalsPage() {
           </div>
         </div>
 
-        {/* ถ้าเลือก กำหนดช่วงวันที่ ให้แสดง Input จากวันที่ - ถึงวันที่ */}
         {subDateFilter === "custom" && (
           <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-2">
             <span className="text-[10px] font-bold text-slate-600 block">เลือกช่วงวันที่ต้องการตรวจสอบ:</span>
@@ -278,86 +299,129 @@ export default function CEOApprovalsPage() {
                 const equipmentName = item.item_name || item.equipment_name || item.reason || "อุปกรณ์ทั่วไป";
 
                 return (
-                  <div key={item.id} className="p-3.5 space-y-2 hover:bg-slate-50 transition">
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="space-y-1 flex-1 min-w-0">
-                        <div>
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-md inline-block ${
-                              item.type === "loan"
-                                ? "bg-purple-100 text-purple-800 border border-purple-200"
-                                : item.type === "leave"
-                                ? "bg-blue-100 text-blue-800 border border-blue-200"
-                                : "bg-amber-100 text-amber-800 border border-amber-200"
-                            }`}
-                          >
-                            {item.type === "loan"
-                              ? "💸 เบิกเงินล่วงหน้า"
-                              : item.type === "leave"
-                              ? "📅 ขอลาหยุด"
-                              : "📦 เบิกอุปกรณ์"}
+                  <div key={item.id} className="p-4 space-y-3 hover:bg-slate-50 transition">
+                    {/* ส่วนหัว: ชื่อ, รหัสพนักงาน, หน่วยงาน & วันที่ */}
+                    <div className="flex justify-between items-start gap-2 border-b border-slate-100 pb-2">
+                      <div className="space-y-1">
+                        <h2 className="text-sm font-extrabold text-slate-900">{item.employee_name || item.applicant_name || "ไม่ระบุชื่อ"}</h2>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[11px] font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                            รหัส: {item.employee_code || item.user_id || "-"}
+                          </span>
+                          <span className="text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                            📍 {item.site_name || "สำนักงานใหญ่"}
                           </span>
                         </div>
-
-                        <div className="flex items-center gap-1.5 pt-0.5">
-                          {item.user_id && (
-                            <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                              ({item.user_id})
-                            </span>
-                          )}
-                          <span className="text-xs font-bold text-slate-900 truncate">
-                            {item.employee_name}
-                          </span>
-                        </div>
-
-                        <p className="text-[11px] text-slate-700 font-medium">
-                          {item.type === "loan" && `จำนวนเงิน: ฿${Number(item.amount || 0).toLocaleString("th-TH")}`}
-                          {item.type === "leave" && `ประเภทการลา: ${item.leave_type || "ลาหยุด"}`}
-                          {item.type === "equipment" && `เบิก: ${equipmentName} ${item.quantity ? `(${item.quantity} ชิ้น)` : ""}`}
+                        <p className="text-[10px] text-slate-400 pt-0.5">
+                          📅 ยื่นเมื่อ: {formatThaiDateTime(item.created_at)}
                         </p>
-
-                        {item.reason && item.type !== "equipment" && (
-                          <p className="text-[10px] text-slate-500">เหตุผล: {item.reason}</p>
-                        )}
-
-                        {isRejected && item.reject_reason && (
-                          <p className="text-[10px] text-rose-600 font-semibold bg-rose-50 px-2 py-0.5 rounded border border-rose-100 mt-1 inline-block">
-                            ❌ เหตุผลปฏิเสธ: {item.reject_reason}
-                          </p>
-                        )}
                       </div>
+                      
+                      {/* ป้ายบอกสถานะฝั่งขวาบน */}
+                      <span
+                        className={`text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
+                          isApproved
+                            ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                            : isRejected
+                            ? "bg-rose-100 text-rose-700 border border-rose-200"
+                            : "bg-amber-100 text-amber-800 border border-amber-200"
+                        }`}
+                      >
+                        {isApproved ? "✅ อนุมัติแล้ว" : isRejected ? "❌ ปฏิเสธแล้ว" : "⏳ รออนุมัติ"}
+                      </span>
+                    </div>
 
-                      {/* ปุ่มอนุมัติ / ปฏิเสธ */}
-                      {isPending ? (
-                        <div className="flex gap-1 shrink-0 pt-0.5">
-                          <button
-                            onClick={() => handleApprove(item.id, item.type)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg transition cursor-pointer"
-                          >
-                            อนุมัติ
-                          </button>
-                          <button
-                            onClick={() => {
-                              setRejectingItem(item);
-                              setRejectReasonInput("");
-                            }}
-                            className="bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded-lg transition cursor-pointer"
-                          >
-                            ปฏิเสธ
-                          </button>
-                        </div>
-                      ) : (
+                    {/* ส่วนเนื้อหา: ประเภท และรายละเอียดทั้งหมด */}
+                    <div className="space-y-1.5 text-xs bg-slate-50/70 p-3 rounded-xl border border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-500 font-medium">ประเภทคำร้อง:</span>
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
-                            isApproved
-                              ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                              : "bg-rose-100 text-rose-700 border border-rose-200"
+                          className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                            item.type === "loan"
+                              ? "bg-purple-100 text-purple-800 border border-purple-200"
+                              : item.type === "leave"
+                              ? "bg-blue-100 text-blue-800 border border-blue-200"
+                              : "bg-amber-100 text-amber-800 border border-amber-200"
                           }`}
                         >
-                          {isApproved ? "อนุมัติแล้ว" : "ปฏิเสธแล้ว"}
+                          {item.type === "loan"
+                            ? "💸 เงินล่วงหน้า"
+                            : item.type === "leave"
+                            ? "📅 ขอลาหยุด"
+                            : "📦 เบิกอุปกรณ์"}
                         </span>
+                      </div>
+
+                      {/* รายละเอียดเจาะลึกตามประเภท */}
+                      {item.type === "loan" && (
+                        <div className="space-y-1 pt-1 border-t border-slate-200/60">
+                          <p className="text-slate-700 font-medium">
+                            ยอดเงินที่เบิก: <strong className="text-emerald-600 font-mono text-sm">฿{Number(item.amount || 0).toLocaleString("th-TH")}</strong>
+                          </p>
+                          {item.reason && (
+                            <p className="text-slate-600">
+                              เหตุผลการเบิก: <span className="text-slate-800">{item.reason}</span>
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {item.type === "leave" && (
+                        <div className="space-y-1 pt-1 border-t border-slate-200/60">
+                          <p className="text-slate-700 font-medium">
+                            ประเภทการลา: <strong className="text-slate-900">{item.leave_type || "ลาหยุด"}</strong>
+                          </p>
+                          {item.reason && (
+                            <p className="text-slate-600">
+                              เหตุผลการลา: <span className="text-slate-800">{item.reason}</span>
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {item.type === "equipment" && (
+                        <div className="space-y-1 pt-1 border-t border-slate-200/60">
+                          <p className="text-slate-700 font-medium">
+                            รายการอุปกรณ์: <strong className="text-slate-900">{equipmentName}</strong> {item.quantity ? `(${item.quantity} ชิ้น)` : ""}
+                          </p>
+                          {item.reason && (
+                            <p className="text-slate-600">
+                              เหตุผลการเบิก: <span className="text-slate-800">{item.reason}</span>
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* แสดงเหตุผลปฏิเสธถ้ามี */}
+                      {isRejected && item.reject_reason && (
+                        <div className="pt-1 mt-1 border-t border-rose-200">
+                          <p className="text-rose-600 font-semibold text-[11px]">
+                            ❌ เหตุผลที่ไม่อนุมัติ: <span className="font-normal">{item.reject_reason}</span>
+                          </p>
+                        </div>
                       )}
                     </div>
+
+                    {/* ส่วนปุ่มดำเนินการ (กรณีสถานะรออนุมัติ) */}
+                    {isPending && (
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={() => handleApprove(item.id, item.type)}
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-xl transition shadow-sm cursor-pointer text-center"
+                        >
+                          ✓ อนุมัติ
+                        </button>
+                        <button
+                          onClick={() => {
+                            setRejectingItem(item);
+                            setRejectReasonInput("");
+                          }}
+                          className="flex-1 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold py-2 rounded-xl transition shadow-sm cursor-pointer text-center"
+                        >
+                          ✕ ไม่อนุมัติ
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -370,46 +434,46 @@ export default function CEOApprovalsPage() {
         </div>
       </main>
 
-      {/* Modal ป๊อปอัปให้ใส่เหตุผลการปฏิเสธ */}
+      {/* Modal ป๊อปอัปกรอกเหตุผลกรณีไม่อนุมัติ */}
       {rejectingItem && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-xs p-4 space-y-3 shadow-2xl animate-in fade-in zoom-in duration-150">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-3 shadow-2xl animate-in fade-in zoom-in duration-150">
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
               <h3 className="text-xs font-bold text-rose-600 flex items-center gap-1">
-                <span>⚠️</span> ระบุเหตุผลการปฏิเสธคำร้อง
+                <span>⚠️</span> ระบุเหตุผลที่ไม่ไม่อนุมัติคำร้อง
               </h3>
               <button
                 onClick={() => setRejectingItem(null)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <p className="text-[11px] text-slate-700 font-medium">
-              พนักงาน: <span className="font-bold text-slate-900">{rejectingItem.employee_name}</span>
+            <p className="text-xs text-slate-700 font-medium">
+              พนักงาน: <span className="font-bold text-slate-900">{rejectingItem.employee_name || rejectingItem.applicant_name}</span>
             </p>
 
             <textarea
               rows={3}
-              placeholder="กรอกเหตุผลที่ปฏิเสธคำร้องนี้..."
+              placeholder="กรอกเหตุผลที่ไม่สามารถอนุมัติคำร้องนี้ได้..."
               value={rejectReasonInput}
               onChange={(e) => setRejectReasonInput(e.target.value)}
-              className="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/30 text-slate-900 placeholder:text-slate-400"
+              className="w-full text-xs p-3 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/30 text-slate-900 placeholder:text-slate-400"
             />
 
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => setRejectingItem(null)}
-                className="flex-1 bg-slate-100 text-slate-600 text-xs font-bold py-2 rounded-xl hover:bg-slate-200 transition"
+                className="flex-1 bg-slate-100 text-slate-600 text-xs font-bold py-2.5 rounded-xl hover:bg-slate-200 transition cursor-pointer"
               >
                 ยกเลิก
               </button>
               <button
                 onClick={handleConfirmReject}
-                className="flex-1 bg-rose-600 text-white text-xs font-bold py-2 rounded-xl hover:bg-rose-700 transition"
+                className="flex-1 bg-rose-600 text-white text-xs font-bold py-2.5 rounded-xl hover:bg-rose-700 transition cursor-pointer shadow-sm"
               >
-                ยืนยันปฏิเสธ
+                ยืนยันไม่อนุมัติ
               </button>
             </div>
           </div>

@@ -20,18 +20,18 @@ enum Role {
 }
 
 model Client {
-  id             String   @id @default(cuid())
-  companyName    String   @map("company_name")
-  contractNumber String?  @map("contract_number")
-  contactPerson  String?  @map("contact_person")
-  contactPhone   String?  @map("contact_phone")
-  accountantName String?  @map("accountant_name")
-  accountantPhone String? @map("accountant_phone")
-  monthlyFee     Float?   @map("monthly_fee")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id              String   @id @default(cuid())
+  companyName     String   @map("company_name")
+  contractNumber  String?  @map("contract_number")
+  contactPerson   String?  @map("contact_person")
+  contactPhone    String?  @map("contact_phone")
+  accountantName  String?  @map("accountant_name")
+  accountantPhone String?  @map("accountant_phone")
+  monthlyFee      Float?   @map("monthly_fee")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
-  sites          Site[]
+  sites           Site[]
 
   @@map("clients")
 }
@@ -57,11 +57,26 @@ enum LeaveStatus {
   CANCELLED
 }
 
+model notifications {
+  id        String   @id @default(cuid()) @map("id")
+  userId    String   @map("user_id")
+  title     String   @map("title")
+  message   String   @map("message")
+  type      String   @default("info") @map("type")
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("notifications")
+}
+
 model Site {
   id              String   @id @default(cuid())
   siteName        String   @map("site_name")
   locationDetails String   @map("location_details") @db.Text
-  clientId        String?  @map("client_id") // <--- เพิ่มฟิลด์เชื่อมโยงลูกค้ารายนี้
+  clientId        String?  @map("client_id")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -110,9 +125,10 @@ model User {
   leaveRequests  LeaveRequest[]
   attendances    Attendance[]
   incidentReports IncidentReport[]
-  logbooks Logbook[]
+  logbooks       Logbook[]
   equipmentRequests EquipmentRequest[]
-  randomChecks RandomCheck[]
+  randomChecks   RandomCheck[]
+  notifications  notifications[]
 
   @@index([siteId])
   @@index([role])
@@ -181,10 +197,10 @@ model ContactInquiry {
 model Attendance {
   id        String   @id @default(cuid())
   userId    String
-  type      String   // "CHECK_IN" หรือ "CHECK_OUT"
+  type      String   
   latitude  Float
   longitude Float
-  images    String[] // เก็บลิสต์รายชื่อไฟล์รูปภาพ
+  images    String[] 
   createdAt DateTime @default(now())
   
   user      User     @relation(fields: [userId], references: [id])
@@ -197,7 +213,7 @@ model IncidentReport {
   images    String[] 
   latitude  Float?   
   longitude Float?   
-  status    String   @default("PENDING") // <--- เพิ่มบรรทัดนี้เข้าไป
+  status    String   @default("PENDING")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -210,11 +226,11 @@ model Logbook {
   id          String   @id @default(cuid())
   userId      String   @map("user_id")
   message     String   @db.Text
-  images      String[] // เก็บอาเรย์ของลิงก์รูปภาพ
+  images      String[] 
   latitude    Float?   
   longitude   Float?   
   siteId      String?  @map("site_id")
-  status      String   @default("PENDING") // PENDING (รอตรวจสอบ), ACKNOWLEDGED (รับทราบแล้ว)
+  status      String   @default("PENDING")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -231,7 +247,7 @@ model EquipmentRequest {
   equipmentType   String?     @map("equipment_type")
   quantity        Int?
   reason          String?     @db.Text
-  status          String      @default("PENDING") // ✅ เปลี่ยนเป็น String ตรงนี้
+  status          String      @default("PENDING")
   itemName        String?     @map("item_name")
   reasonType      String?     @map("reason_type")
   size            String?
