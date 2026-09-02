@@ -43,7 +43,7 @@ export async function GET() {
     let targetRound = 20;
     let isWindowOpen = false;
 
-    if (currentDay >= 11 && currentDay <= 17) {
+    if (currentDay >= 1 && currentDay <= 17) {
       targetRound = 20;
       isWindowOpen = true;
     } else if (currentDay >= 18 && currentDay <= 30) {

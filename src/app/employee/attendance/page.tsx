@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 
 export default function EmployeeAttendancePage() {
@@ -9,8 +9,15 @@ export default function EmployeeAttendancePage() {
   const [message, setMessage] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [location, setLocation] = useState<{ lat: number | null; lng: number | null }>({ lat: null, lng: null });
-  const [selectedImages, setSelectedImages] = useState<File[]>([]);
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // State สำหรับเปิด Custom Camera Modal
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
 
   useEffect(() => {
     fetchAttendance();
@@ -30,12 +37,16 @@ export default function EmployeeAttendancePage() {
         { enableHighAccuracy: true }
       );
     }
+
+    return () => {
+      stopCamera();
+    };
   }, []);
 
   const fetchAttendance = async () => {
     try {
       const res = await fetch("/api/employee/attendance", {
-        cache: "no-store", // บังคับไม่ให้แคชข้อมูล ดึงใหม่สดๆ ทุกครั้ง
+        cache: "no-store",
       });
       const data = await res.json();
       if (data.ok) {
@@ -46,38 +57,65 @@ export default function EmployeeAttendancePage() {
     }
   };
 
-  // ใช้เทียบวันที่แบบสากล (YYYY-MM-DD) เพื่อตัดปัญหาเรื่อง Timezone และภาษาบน Vercel
   const todayString = new Date().toISOString().split("T")[0];
-  
   const todayRecords = history.filter(item => {
     if (!item.rawDate) return false;
     const itemDateStr = new Date(item.rawDate).toISOString().split("T")[0];
     return itemDateStr === todayString;
   });
   
-  // เช็คว่าปัจจุบันมีกะไหนที่ "ยังไม่ได้เช็คเอาท์" (กำลังทำงานอยู่) หรือไม่
   const activeRecord = todayRecords.find(item => item.checkIn && item.checkIn !== "-" && (!item.checkOut || item.checkOut === "-"));
-  const isWorking = !!activeRecord; // ถ้าเป็น true แปลว่ากำลังทำงานอยู่ (ต้องเช็คเอาท์ก่อน)
+  const isWorking = !!activeRecord;
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    const filesArray = Array.from(e.target.files);
-
-    if (filesArray.length < 1) {
-      setErrorMsg("กรุณาแนบรูปภาพอย่างน้อย 1 รูป");
-      return;
-    }
-
-    if (filesArray.length > 10) {
-      setErrorMsg("สามารถแนบรูปภาพได้สูงสุดไม่เกิน 10 รูปเท่านั้น");
-      return;
-    }
-
+  // เปิดกล้องเบราว์เซอร์
+  const startCamera = async () => {
     setErrorMsg("");
-    setSelectedImages(filesArray);
+    setShowCameraModal(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }, // ใช้กล้องหลัง
+        audio: false,
+      });
+      setCameraStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error("Camera error:", err);
+      setErrorMsg("ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการเข้าถึงกล้องในเบราว์เซอร์");
+      setShowCameraModal(false);
+    }
+  };
 
-    const urls = filesArray.map((file) => URL.createObjectURL(file));
-    setPreviewUrls(urls);
+  // ปิดกล้อง
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+  };
+
+  // กดถ่ายรูปจากวิดีโอ
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const file = new File([blob], `attendance_${Date.now()}.jpg`, { type: "image/jpeg" });
+          setSelectedImage(file);
+          setPreviewUrl(URL.createObjectURL(file));
+          stopCamera();
+          setShowCameraModal(false);
+        }
+      }, "image/jpeg", 0.85);
+    }
   };
 
   const handleAttendance = async (type: "CHECK_IN" | "CHECK_OUT") => {
@@ -86,8 +124,8 @@ export default function EmployeeAttendancePage() {
       return;
     }
 
-    if (selectedImages.length < 1 || selectedImages.length > 10) {
-      setErrorMsg("กรุณาแนบรูปภาพอย่างน้อย 1 รูป และสูงสุดไม่เกิน 10 รูป");
+    if (!selectedImage) {
+      setErrorMsg("กรุณาถ่ายรูปเจ้าหน้าที่ผู้มารับช่วงต่อเพื่อยืนยันการลงเวลา");
       return;
     }
 
@@ -100,10 +138,7 @@ export default function EmployeeAttendancePage() {
       formData.append("type", type);
       formData.append("latitude", location.lat.toString());
       formData.append("longitude", location.lng.toString());
-      
-      selectedImages.forEach((file) => {
-        formData.append("images", file);
-      });
+      formData.append("images", selectedImage);
 
       const res = await fetch("/api/employee/attendance", {
         method: "POST",
@@ -116,9 +151,9 @@ export default function EmployeeAttendancePage() {
         throw new Error(data.error || "ไม่สามารถบันทึกเวลาได้");
       }
 
-      setMessage(type === "CHECK_IN" ? "เช็คอินเข้างานกะใหม่สำเร็จ!" : "เช็คเอาท์ออกงานเรียบร้อยแล้ว");
-      setSelectedImages([]);
-      setPreviewUrls([]);
+      setMessage(type === "CHECK_IN" ? "เช็คอินเข้างานสำเร็จ!" : "เช็คเอาท์ออกงานเรียบร้อยแล้ว");
+      setSelectedImage(null);
+      setPreviewUrl(null);
       fetchAttendance();
     } catch (err: any) {
       setErrorMsg(err.message || "เกิดข้อผิดพลาด");
@@ -158,62 +193,72 @@ export default function EmployeeAttendancePage() {
           </span>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 space-y-3">
+        <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 space-y-4">
           
-          {/* พิกัด GPS */}
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col gap-1 text-xs text-slate-600">
-            <span className="font-semibold text-slate-500">📍 พิกัดปัจจุบันของคุณ:</span>
+          {/* พิกัด GPS แบบตัวอักษร Lat/Long */}
+          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 flex flex-col gap-1 text-xs text-slate-600 shadow-inner">
+            <span className="font-bold text-slate-500">📍 พิกัด GPS ยืนยันตำแหน่ง:</span>
             {location.lat !== null && location.lng !== null ? (
-              <span className="font-mono font-bold text-emerald-600">
-                Lat: {location.lat.toFixed(6)}, Lng: {location.lng.toFixed(6)} (พร้อมใช้งาน)
+              <span className="font-mono font-bold text-emerald-600 text-sm">
+                {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
               </span>
             ) : (
-              <span className="font-bold text-amber-600 animate-pulse">
+              <span className="font-bold text-amber-600 animate-pulse text-xs">
                 กำลังค้นหาพิกัด GPS...
               </span>
             )}
           </div>
 
-          {/* แสดง Google Map (ฟรี 100%) */}
-          {location.lat !== null && location.lng !== null && (
-            <div className="w-full h-36 rounded-xl overflow-hidden border border-slate-200 shadow-inner">
-              <iframe
-                width="100%"
-                height="100%"
-                frameBorder="0"
-                scrolling="no"
-                src={`https://maps.google.com/maps?q=${location.lat},${location.lng}&z=15&output=embed`}
-                className="w-full h-full border-0"
-                loading="lazy"
-              ></iframe>
-            </div>
-          )}
-
-          {/* ส่วนแนบรูปภาพ */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 flex justify-between items-center">
-              <span>แนบรูปถ่ายยืนยัน (1 - 10 รูป) *</span>
-              {selectedImages.length === 0 && (
+          {/* ส่วนแนบรูปถ่าย พร้อมคำชี้แจง */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="block text-xs font-bold text-slate-700">
+                ถ่ายรูปเจ้าหน้าที่ผู้มารับช่วงต่อ (1 รูป) *
+              </label>
+              {!selectedImage && (
                 <span className="text-red-500 font-bold text-[10px] bg-red-50 px-2 py-0.5 rounded-md border border-red-200 animate-pulse">
-                  ⚠️ ต้องแนบรูปก่อน
+                  ⚠️ ต้องถ่ายรูปก่อน
                 </span>
               )}
-            </label>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleImageChange}
-              className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 cursor-pointer border border-slate-200 rounded-xl p-1 bg-slate-50"
-            />
-            
-            {previewUrls.length > 0 && (
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {previewUrls.map((url, index) => (
-                  <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-sm">
-                    <img src={url} alt={`Preview ${index}`} className="w-full h-full object-cover" />
+            </div>
+
+            {/* คำชี้แจง */}
+            <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 font-medium leading-relaxed">
+              💡 <strong>คำชี้แจง:</strong> กรุณาถ่ายรูปเจ้าหน้าที่หรือเพื่อนร่วมงานที่มารับช่วงต่อในกะถัดไป เพื่อยืนยันการส่งมอบงาน
+            </div>
+
+            {!previewUrl ? (
+              <div
+                onClick={startCamera}
+                className="border-2 border-dashed border-slate-300 hover:border-orange-500 bg-slate-50 hover:bg-orange-50/40 rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 shadow-inner"
+              >
+                <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-xl text-orange-600 shadow-sm">
+                  📷
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-800">
+                    กดเพื่อเปิดกล้องถ่ายภาพผู้มารับช่วงต่อ
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    แตะเพื่อเริ่มใช้งานกล้องบนหน้าเว็บ
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden border-2 border-emerald-500 shadow-md bg-slate-900">
+                  <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                  <div className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow">
+                    ✓ ถ่ายภาพสำเร็จ
                   </div>
-                ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={startCamera}
+                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition border border-slate-200 cursor-pointer"
+                >
+                  🔄 ถ่ายใหม่อีกครั้ง
+                </button>
               </div>
             )}
           </div>
@@ -232,20 +277,69 @@ export default function EmployeeAttendancePage() {
         </div>
       </main>
 
+      {/* Modal เปิดกล้องสดพร้อมเส้นไกด์ไลน์ (Dashed Wireframe Guide) */}
+      {showCameraModal && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-between p-4">
+          <div className="w-full flex justify-between items-center text-white py-2">
+            <span className="text-xs font-bold">📷 จัดตำแหน่งผู้มารับช่วงต่อให้อยู่ในกรอบ</span>
+            <button
+              onClick={() => {
+                stopCamera();
+                setShowCameraModal(false);
+              }}
+              className="text-white bg-slate-800 hover:bg-slate-700 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* ช่องแสดงวิดีโอกล้องสดพร้อมเส้นประไกด์ไลน์ */}
+          <div className="relative flex-1 w-full max-w-md flex items-center justify-center overflow-hidden rounded-2xl bg-black my-2">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="absolute inset-0 w-full h-full object-cover"
+            ></video>
+
+            {/* เส้นไกด์ไลน์โครงร่าง (Dashed Wireframe Guide) */}
+            <div className="absolute inset-8 border-2 border-dashed border-white/70 rounded-3xl pointer-events-none flex flex-col items-center justify-center">
+              <div className="w-24 h-32 border-2 border-dashed border-emerald-400 rounded-t-full mb-2 opacity-90"></div>
+              <span className="bg-black/60 text-emerald-300 text-[10px] font-bold px-3 py-1 rounded-full border border-emerald-500/50">
+                กรุณาจัดตำแหน่งให้อยู่ในกรอบ
+              </span>
+            </div>
+          </div>
+
+          <canvas ref={canvasRef} className="hidden"></canvas>
+
+          {/* ปุ่มชัตเตอร์ถ่ายรูป */}
+          <div className="w-full max-w-md py-4 flex justify-center items-center">
+            <button
+              onClick={capturePhoto}
+              className="w-16 h-16 rounded-full bg-white border-4 border-slate-300 shadow-xl flex items-center justify-center active:scale-95 transition cursor-pointer"
+            >
+              <div className="w-12 h-12 rounded-full bg-orange-600"></div>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Sticky Footer สำหรับปุ่มกดด้านล่าง */}
       <div className="fixed bottom-14 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 shadow-lg z-40">
         <div className="max-w-md mx-auto space-y-2">
           
-          {selectedImages.length === 0 && (
+          {!selectedImage && (
             <div className="text-[11px] text-center text-red-600 font-bold bg-red-50 py-1.5 px-3 rounded-lg border border-red-200 flex items-center justify-center gap-1">
-              <span>⚠️ กรุณาแนบรูปถ่ายยืนยันด้านบนก่อนกดลงเวลา</span>
+              <span>⚠️ กรุณาถ่ายรูปผู้มารับช่วงต่อด้านบนก่อนกดลงเวลา</span>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => handleAttendance("CHECK_IN")}
-              disabled={loading || location.lat === null || selectedImages.length === 0 || isWorking}
+              disabled={loading || location.lat === null || !selectedImage || isWorking}
               className="py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer disabled:opacity-50 disabled:bg-slate-400 flex flex-col items-center justify-center gap-0.5"
             >
               <span>🟢 เช็คอินเข้างาน</span>
@@ -253,7 +347,7 @@ export default function EmployeeAttendancePage() {
             </button>
             <button
               onClick={() => handleAttendance("CHECK_OUT")}
-              disabled={loading || location.lat === null || selectedImages.length === 0 || !isWorking}
+              disabled={loading || location.lat === null || !selectedImage || !isWorking}
               className="py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer disabled:opacity-50 disabled:bg-slate-400 flex flex-col items-center justify-center gap-0.5"
             >
               <span>🔴 เช็คเอาท์ออกงาน</span>
