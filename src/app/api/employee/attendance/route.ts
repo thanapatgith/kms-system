@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { uploadAttendanceImage } from "@/lib/supabaseStorage"; // นำเข้าฟังก์ชันที่เราสร้างขึ้น
+import { uploadAttendanceImage } from "@/lib/supabaseStorage";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+// ฟังก์ชันสำหรับแปลงเวลาปัจจุบันให้เป็นเวลาประเทศไทย (UTC+7)
+function getThaiCurrentDate() {
+  const now = new Date();
+  // ดึงเวลาปัจจุบันในโซน Asia/Bangkok
+  const thaiTimeString = now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
+  return new Date(thaiTimeString);
+}
 
 // 1. ดึงประวัติการลงเวลาของพนักงาน (GET)
 export async function GET(req: Request) {
@@ -45,7 +53,7 @@ export async function GET(req: Request) {
           locationIn: latLngStr,
           locationOut: "-",
           imagesIn: item.images || [], 
-          imagesOut: [],              
+          imagesOut: [],               
           status: "ปกติ",
         });
       } else if (item.type === "CHECK_OUT") {
@@ -101,8 +109,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "กรุณาแนบรูปภาพอย่างน้อย 1 รูป" }, { status: 400 });
     }
 
-    // ตรวจสอบสถานะกะปัจจุบัน
-    const todayStart = new Date();
+    // ใช้เวลาประเทศไทยในการตรวจสอบกะวันนี้
+    const thaiNow = getThaiCurrentDate();
+    const todayStart = new Date(thaiNow);
     todayStart.setHours(0, 0, 0, 0);
 
     const todayRecords = await prisma.attendance.findMany({
@@ -136,7 +145,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // บันทึกลงฐานข้อมูล (เก็บเป็น Public URL)
+    // บันทึกลงฐานข้อมูลโดยระบุเวลา createdAt เป็นเวลาประเทศไทย (thaiNow)
     const newAttendance = await prisma.attendance.create({
       data: {
         userId: session.userId,
@@ -144,6 +153,7 @@ export async function POST(req: Request) {
         latitude: Number(latitude),
         longitude: Number(longitude),
         images: imageUrls,
+        createdAt: thaiNow, // บันทึกเวลาไทยตรงๆ
       },
     });
 
