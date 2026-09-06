@@ -65,6 +65,10 @@ export default function CEOReportsPage() {
   const [patrolCount, setPatrolCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
+  // Modal สำหรับซูมดูรูปภาพแบบสไลด์ซ้าย-ขวา
+  const [activeImages, setActiveImages] = useState<string[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
+
   // ตัวกรองข้อมูลเพิ่มเติม
   const getTodayString = () => {
     const today = new Date();
@@ -98,6 +102,22 @@ export default function CEOReportsPage() {
     }
     fetchReports();
   }, [selectedMonth]);
+
+  // ฟังชั่นก์กดเลื่อนรูปภาพซ้าย-ขวาด้วยคีย์บอร์ด
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (activeImages.length === 0) return;
+      if (e.key === "ArrowLeft") {
+        setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : activeImages.length - 1));
+      } else if (e.key === "ArrowRight") {
+        setCurrentImageIndex((prev) => (prev < activeImages.length - 1 ? prev + 1 : 0));
+      } else if (e.key === "Escape") {
+        setActiveImages([]);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeImages]);
 
   // ดึงรายชื่อ Site งานทั้งหมดมารวมเป็น Dropdown
   const uniqueSites = useMemo(() => {
@@ -134,7 +154,6 @@ export default function CEOReportsPage() {
 
   // กรองข้อมูลตามเงื่อนไขทั้งหมด
   const filteredIncidents = incidents.filter((item) => {
-    // 1. กรองตามช่วงวันที่
     const dateStr = item.created_at || item.createdAt;
     if (dateStr && (fromDate || toDate)) {
       const d = new Date(dateStr);
@@ -147,20 +166,17 @@ export default function CEOReportsPage() {
       if (toDate && itemLocalDate > toDate) return false;
     }
 
-    // 2. กรองตาม Site งาน
     if (selectedSite !== "ALL") {
       const itemSite = item.site_name || item.siteName || item.location;
       if (itemSite !== selectedSite) return false;
     }
 
-    // 3. กรองตามสถานะการรับทราบ
     if (selectedStatus !== "ALL") {
       const isAcknowledged = item.status === "ACKNOWLEDGED" || item.status === "resolved" || item.status === "เรียบร้อย";
       if (selectedStatus === "ACKNOWLEDGED" && !isAcknowledged) return false;
       if (selectedStatus === "PENDING" && isAcknowledged) return false;
     }
 
-    // 4. กรองตามชื่อหรือรหัสพนักงาน
     if (searchEmployee.trim() !== "") {
       const keyword = searchEmployee.toLowerCase();
       const empName = (item.employee_name || item.employeeName || item.user?.name || "").toLowerCase();
@@ -251,7 +267,6 @@ export default function CEOReportsPage() {
             </button>
           </div>
 
-          {/* ค้นหาตามชื่อหรือรหัสพนักงาน */}
           <div>
             <label className="block text-[10px] text-slate-400 font-bold mb-1">ค้นหาชื่อ / รหัสพนักงาน:</label>
             <input
@@ -263,7 +278,6 @@ export default function CEOReportsPage() {
             />
           </div>
 
-          {/* 1. ปุ่มลัดช่วงเวลา: วันนี้ / 7 วัน / ทั้งหมด */}
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-slate-500 font-semibold">ช่วงเวลา:</span>
             <div className="flex gap-1">
@@ -291,7 +305,6 @@ export default function CEOReportsPage() {
             </div>
           </div>
 
-          {/* 2. จากวันที่ ... ถึง วันที่ ... */}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-[10px] text-slate-400 font-bold mb-1">ตั้งแต่วันที่:</label>
@@ -315,7 +328,6 @@ export default function CEOReportsPage() {
             </div>
           </div>
 
-          {/* 3. ชื่อ site งาน / site งานทั้งหมด */}
           <div>
             <label className="block text-[10px] text-slate-400 font-bold mb-1">ไซต์งาน (Site):</label>
             <select
@@ -332,7 +344,6 @@ export default function CEOReportsPage() {
             </select>
           </div>
 
-          {/* 4. สถานะรับทราบ: ทั้งหมด / ยังไม่ได้รับทราบ / รับทราบแล้ว */}
           <div>
             <label className="block text-[10px] text-slate-400 font-bold mb-1">สถานะการรับทราบ:</label>
             <select
@@ -382,7 +393,6 @@ export default function CEOReportsPage() {
                 return (
                   <div key={item.id} className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-2.5 text-xs">
                     
-                    {/* ส่วนหัวของการ์ด: วันที่/เวลา และสถานะ */}
                     <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md font-bold text-[10px]">
@@ -409,7 +419,6 @@ export default function CEOReportsPage() {
                       </div>
                     </div>
 
-                    {/* ข้อมูลผู้ปฏิบัติงาน (พร้อมรหัสพนักงาน) */}
                     <div className="text-[11px] text-slate-600 flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <span>👤 ผู้รายงาน:</span>
@@ -420,7 +429,6 @@ export default function CEOReportsPage() {
                       </span>
                     </div>
 
-                    {/* ข้อมูลไซต์งาน (รองรับชื่อยาวๆ) */}
                     <div className="bg-amber-50/60 border border-amber-200/60 p-2 rounded-xl space-y-0.5">
                       <span className="text-[10px] font-bold text-amber-800 flex items-center gap-1">
                         📍 ไซต์งานที่ปฏิบัติหน้าที่:
@@ -430,28 +438,35 @@ export default function CEOReportsPage() {
                       </p>
                     </div>
 
-                    {/* ข้อความรายงาน */}
                     <p className="text-slate-800 font-medium leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                       {noteText}
                     </p>
 
-                    {/* รูปภาพแนบ (ถ้ามี) */}
                     {images.length > 0 && (
                       <div className="space-y-1.5 pt-1">
                         <span className="text-[10px] text-slate-400 font-semibold">
-                          🖼️ รูปภาพแนบ ({images.length} รูป):
+                          🖼️ รูปภาพแนบ ({images.length} รูป) (คลิกเพื่อดูภาพใหญ่):
                         </span>
                         <div className="grid grid-cols-4 gap-2">
                           {images.map((imgUrl: string, idx: number) => (
-                            <a key={idx} href={imgUrl} target="_blank" rel="noopener noreferrer" className="block aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 hover:opacity-90 transition">
+                            <div
+                              key={idx}
+                              onClick={() => {
+                                setActiveImages(images);
+                                setCurrentImageIndex(idx);
+                              }}
+                              className="block aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 hover:opacity-95 transition cursor-pointer relative group"
+                            >
                               <img src={imgUrl} alt="report-img" className="w-full h-full object-cover" />
-                            </a>
+                              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs">
+                                🔍
+                              </div>
+                            </div>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {/* พิกัด GPS (ถ้ามี) */}
                     {lat && lng && (
                       <div className="pt-1 flex items-center gap-1 text-[10px] text-slate-400 font-mono">
                         <span>📍 พิกัด: {lat}, {lng}</span>
@@ -466,8 +481,68 @@ export default function CEOReportsPage() {
         </div>
       </main>
 
+      {/* Modal สำหรับแสดงรูปภาพขนาดใหญ่ พร้อมปุ่มเลื่อนซ้าย-ขวา */}
+      {activeImages.length > 0 && (
+        <div
+          onClick={() => setActiveImages([])}
+          className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn"
+        >
+          <div className="relative max-w-xl w-full max-h-[90vh] flex flex-col items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            
+            {/* ปุ่มปิด (X) */}
+            <button
+              onClick={() => setActiveImages([])}
+              className="absolute -top-12 right-0 text-white bg-slate-800 hover:bg-slate-700 w-9 h-9 rounded-full font-bold flex items-center justify-center transition cursor-pointer shadow-lg text-sm z-50"
+            >
+              ✕
+            </button>
+
+            {/* ตัวบอกลำดับรูปภาพ เช่น 1 / 3 */}
+            <div className="absolute -top-12 left-0 text-white bg-slate-800/80 px-3 py-1.5 rounded-full text-xs font-bold font-mono">
+              รูปที่ {currentImageIndex + 1} จาก {activeImages.length}
+            </div>
+
+            {/* พื้นที่รูปภาพ */}
+            <div className="relative w-full flex items-center justify-center">
+              
+              {/* ปุ่มเลื่อนซ้าย */}
+              {activeImages.length > 1 && (
+                <button
+                  onClick={() => setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : activeImages.length - 1))}
+                  className="absolute left-2 z-10 bg-black/60 hover:bg-black text-white w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold transition shadow-lg cursor-pointer"
+                >
+                  ‹
+                </button>
+              )}
+
+              <img
+                src={activeImages[currentImageIndex]}
+                alt={`Slide ${currentImageIndex + 1}`}
+                className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-2xl border border-slate-700 bg-black"
+              />
+
+              {/* ปุ่มเลื่อนขวา */}
+              {activeImages.length > 1 && (
+                <button
+                  onClick={() => setCurrentImageIndex((prev) => (prev < activeImages.length - 1 ? prev + 1 : 0))}
+                  className="absolute right-2 z-10 bg-black/60 hover:bg-black text-white w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold transition shadow-lg cursor-pointer"
+                >
+                  ›
+                </button>
+              )}
+
+            </div>
+
+            <p className="text-slate-300 text-[11px] mt-4 bg-slate-900/90 px-4 py-1.5 rounded-full border border-slate-700 shadow-md">
+              คลิกปุ่มลูกศรซ้าย/ขวาบนภาพ หรือกดปุ่มคีย์บอร์ด ⬅ ➡ เพื่อเปลี่ยนรูป
+            </p>
+
+          </div>
+        </div>
+      )}
+
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-2 py-2 flex justify-around items-center z-50 shadow-lg max-w-md mx-auto">
+      <nav className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-2 py-2 flex justify-around items-center z-40 shadow-lg max-w-md mx-auto">
         <Link href="/ceo/dashboard" className="flex flex-col items-center text-slate-400 hover:text-amber-400 text-[10px] font-semibold transition">
           <span className="text-base mb-0.5">📊</span>แดชบอร์ด
         </Link>
