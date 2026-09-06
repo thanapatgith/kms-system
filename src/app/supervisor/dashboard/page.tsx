@@ -3,18 +3,18 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { calculateLoanDetails } from "@/utils/loanCalculator";
 
 export default function SupervisorDashboardPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
   const [stats, setStats] = useState<any>({
-    remainingCredit: 9340,
-    usedCredit: 0,
-    totalCredit: 9340,
-    workedDays: 31,
-    grossEarnings: 49999.9,
-    netSalary: 48399.9,
-    totalDeductions: 1599.997
+    remainingCredit: 11050,
+    workedDays: 25,
+    grossEarnings: 13000,
+    netSalary: 13000,
+    totalDeductions: 0,
+    totalBorrowedThisMonth: 0
   });
   const [loading, setLoading] = useState(true);
   const [leavesCount] = useState(4);
@@ -23,7 +23,7 @@ export default function SupervisorDashboardPage() {
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   const [notifications] = useState([
-    { id: "noti-1", title: "มีคำขออนุมัติใบมารอการพิจารณา", message: "พนักงานในสังกัดได้ยื่นคำขอลาใหม่ กรุณาตรวจสอบ", time: "10 นาทีที่แล้ว" },
+    { id: "noti-1", title: "มีคำขออนุมัติใบลารอการพิจารณา", message: "พนักงานในสังกัดได้ยื่นคำขอลาใหม่ กรุณาตรวจสอบ", time: "10 นาทีที่แล้ว" },
     { id: "noti-2", title: "คำขอเบิกอุปกรณ์ใหม่", message: "มีรายการขอเบิกอุปกรณ์จากพนักงานรอการอนุมัติ", time: "1 ชั่วโมงที่แล้ว" },
   ]);
 
@@ -57,12 +57,37 @@ export default function SupervisorDashboardPage() {
     }
   };
 
-  // ดึงค่าจริงจาก API พร้อมปัดเศษทศนิยมให้เป็นจำนวนเต็ม
+  const calculateCycleWorkDays = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+
+    let startDate = new Date(year, month, 11);
+    if (now.getDate() < 11) {
+      startDate = new Date(year, month - 1, 11);
+    }
+    startDate.setHours(0, 0, 0, 0);
+
+    return stats.workedDays > 0 ? stats.workedDays : Math.max(0, Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  };
+
   const dailyWage = profile?.dailyRate || 520;
-  const workedDays = stats.workedDays || 31;
-  const grossEarnings = Math.round(stats.grossEarnings ?? (workedDays * dailyWage));
+  const workedDays = stats.workedDays > 0 ? stats.workedDays : calculateCycleWorkDays();
+  const grossEarnings = Math.round(stats.grossEarnings || (workedDays * dailyWage));
   const totalDeduction = Math.round(stats.totalDeductions ?? 0);
-  const netSalaryPayable = Math.round(stats.netSalary ?? (grossEarnings - totalDeduction));
+  const netSalaryPayable = Math.round(stats.netSalary || (grossEarnings - totalDeduction));
+
+  // ใช้ฟังก์ชันกลางคำนวณสิทธิ์กู้ยืมสูงสุดให้ตรงกับหน้ากู้ยืม 100% แบบนิ่งสนิท
+  const loanCalc = calculateLoanDetails({
+    baseDailyRate: dailyWage,
+    workedDaysThisCycle: workedDays,
+    requestedAmount: 0,
+    socialSecurity: 0,
+    tax: 0,
+  });
+
+  const totalBorrowedThisMonth = stats.totalBorrowedThisMonth || 0;
+  const remainingCredit = Math.max(0, loanCalc.maxQuota - totalBorrowedThisMonth);
 
   const unreadCount = notifications.length;
 
@@ -133,7 +158,7 @@ export default function SupervisorDashboardPage() {
 
             <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-700/60 text-center font-mono text-[10px]">
               <div className="bg-slate-900/50 p-1.5 rounded-xl">
-                <span className="block text-[9px] font-sans text-slate-400">ทำแล้ว</span>
+                <span className="block text-[9px] font-sans text-slate-400">ทำแล้ว (นับจาก 11)</span>
                 <span className="font-bold text-slate-200">{workedDays} วัน</span>
               </div>
               <div className="bg-slate-900/50 p-1.5 rounded-xl">
@@ -170,16 +195,57 @@ export default function SupervisorDashboardPage() {
               <span className="text-amber-600 font-bold">รอบนี้</span>
             </div>
             <p className="text-base font-bold text-amber-600 font-mono">
-              ฿{(stats.remainingCredit ?? 9340).toLocaleString()}
+              ฿{remainingCredit.toLocaleString()}
             </p>
           </Link>
         </div>
 
-        {/* ⚡ เมนูลัดบริการพนักงาน */}
+        {/* 🛡️ เมนูจัดการผู้ควบคุมงาน (พิเศษ) */}
         <div className="space-y-2">
           <h3 className="text-xs font-bold text-slate-800 px-1 flex items-center gap-1.5">
+            <span>🛡️</span>
+            <span>เมนูจัดการผู้ควบคุมงาน (พิเศษ)</span>
+          </h3>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <Link href="/supervisor/logbook" className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm hover:border-amber-400 transition flex items-center gap-3">
+              <span className="text-xl">📋</span>
+              <div>
+                <span className="font-bold text-slate-900 block">รายงาน LogBook</span>
+                <span className="text-[10px] text-slate-400">ตรวจบันทึกงานพนักงาน</span>
+              </div>
+            </Link>
+
+            <Link href="/supervisor/leaves" className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm hover:border-amber-400 transition flex items-center gap-3">
+              <span className="text-xl">📝</span>
+              <div>
+                <span className="font-bold text-slate-900 block">อนุมัติใบลา</span>
+                <span className="text-[10px] text-slate-400">พิจารณาคำขอลาพนักงาน</span>
+              </div>
+            </Link>
+
+            <Link href="/supervisor/equipment-approval" className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm hover:border-amber-400 transition flex items-center gap-3">
+              <span className="text-xl">📦</span>
+              <div>
+                <span className="font-bold text-slate-900 block">อนุมัติเบิกอุปกรณ์</span>
+                <span className="text-[10px] text-slate-400">ตรวจสอบคำขออุปกรณ์พนักงาน</span>
+              </div>
+            </Link>
+
+            <Link href="/supervisor/random-check" className="bg-amber-50/70 p-3.5 rounded-2xl border border-amber-200 shadow-sm hover:bg-amber-100 transition flex items-center gap-3">
+              <span className="text-xl">📍</span>
+              <div>
+                <span className="font-bold text-amber-900 block">สุ่มตรวจหน้างาน</span>
+                <span className="text-[10px] text-amber-700">เช็กอิน & ถ่ายรูปหน่วยงาน</span>
+              </div>
+            </Link>
+          </div>
+        </div>
+
+        {/* ⚡ เมนูลัดบริการพนักงาน (พื้นฐาน / กรณีคนขาด) */}
+        <div className="space-y-2 pt-1">
+          <h3 className="text-xs font-bold text-slate-800 px-1 flex items-center gap-1.5">
             <span>⚡</span>
-            <span>เมนูลัดบริการพนักงาน (พื้นฐาน)</span>
+            <span>เมนูลัดบริการพนักงาน (พื้นฐาน / กรณีคนขาด)</span>
           </h3>
           
           <div className="grid grid-cols-2 gap-2.5 text-xs">
@@ -228,47 +294,6 @@ export default function SupervisorDashboardPage() {
               <div>
                 <h4 className="text-xs font-bold text-slate-900">เบิกอุปกรณ์</h4>
                 <p className="text-[9px] text-slate-400">ชุดแต่งกาย / เติมคลัง</p>
-              </div>
-            </Link>
-          </div>
-        </div>
-
-        {/* 🛠️ เมนูจัดการพิเศษของผู้ควบคุมงาน */}
-        <div className="space-y-2 pt-1">
-          <h3 className="text-xs font-bold text-slate-800 px-1 flex items-center gap-1.5">
-            <span>🛡️</span>
-            <span>เมนูจัดการผู้ควบคุมงาน (พิเศษ)</span>
-          </h3>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <Link href="/supervisor/logbook" className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm hover:border-amber-400 transition flex items-center gap-3">
-              <span className="text-xl">📋</span>
-              <div>
-                <span className="font-bold text-slate-900 block">รายงาน LogBook</span>
-                <span className="text-[10px] text-slate-400">ตรวจบันทึกงานพนักงาน</span>
-              </div>
-            </Link>
-
-            <Link href="/supervisor/leaves" className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm hover:border-amber-400 transition flex items-center gap-3">
-              <span className="text-xl">📝</span>
-              <div>
-                <span className="font-bold text-slate-900 block">อนุมัติใบลา</span>
-                <span className="text-[10px] text-slate-400">พิจารณาคำขอลาพนักงาน</span>
-              </div>
-            </Link>
-
-            <Link href="/supervisor/equipment-approval" className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm hover:border-amber-400 transition flex items-center gap-3">
-              <span className="text-xl">📦</span>
-              <div>
-                <span className="font-bold text-slate-900 block">อนุมัติเบิกอุปกรณ์</span>
-                <span className="text-[10px] text-slate-400">ตรวจสอบคำขออุปกรณ์พนักงาน</span>
-              </div>
-            </Link>
-
-            <Link href="/supervisor/random-check" className="bg-amber-50/70 p-3.5 rounded-2xl border border-amber-200 shadow-sm hover:bg-amber-100 transition flex items-center gap-3">
-              <span className="text-xl">📍</span>
-              <div>
-                <span className="font-bold text-amber-900 block">สุ่มตรวจหน้างาน</span>
-                <span className="text-[10px] text-amber-700">เช็กอิน & ถ่ายรูปหน่วยงาน</span>
               </div>
             </Link>
           </div>
@@ -384,22 +409,6 @@ export default function SupervisorDashboardPage() {
           </div>
         </div>
       )}
-
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-2 py-2 flex justify-around items-center z-40 shadow-lg max-w-md mx-auto">
-        <Link href="/supervisor/dashboard" className="flex flex-col items-center text-amber-400 text-[10px] font-bold transition">
-          <span className="text-base mb-0.5">📊</span>แดชบอร์ด
-        </Link>
-        <Link href="/supervisor/leaves" className="flex flex-col items-center text-slate-400 hover:text-amber-400 text-[10px] font-semibold transition">
-          <span className="text-base mb-0.5">📝</span>อนุมัติลา
-        </Link>
-        <Link href="/supervisor/attendance" className="flex flex-col items-center text-slate-400 hover:text-amber-400 text-[10px] font-semibold transition">
-          <span className="text-base mb-0.5">⏱️</span>เช็คเวลา
-        </Link>
-        <Link href="/supervisor/logbook" className="flex flex-col items-center text-slate-400 hover:text-amber-400 text-[10px] font-semibold transition">
-          <span className="text-base mb-0.5">📋</span>Logbook
-        </Link>
-      </nav>
     </div>
   );
 }

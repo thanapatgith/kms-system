@@ -11,11 +11,30 @@ export async function GET() {
       return NextResponse.json({ error: "ยังไม่ได้เข้าสู่ระบบ" }, { status: 401 });
     }
 
-    // 🔓 บังคับเปิดรอบยื่นกู้เพื่อให้ทดสอบได้ทันที
+    // 1. ดึงข้อมูลโปรไฟล์พนักงานเพื่อเอาอัตราค่าจ้างจริง (daily_rate)
+    const { data: profile } = await supabase
+      .from("profiles") // หรือตารางผู้ใช้งานของคุณ
+      .select("*")
+      .eq("id", session.userId)
+      .single();
+
+    const dailyWage = Number(profile?.daily_rate || profile?.dailyRate) || 520;
+
+    // 2. คำนวณวันทำงานจริงในรอบปัจจุบัน (นับจากวันที่ 11 ของรอบนี้)
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    let startDate = new Date(year, month, 11);
+    if (now.getDate() < 11) {
+      startDate = new Date(year, month - 1, 11);
+    }
+    startDate.setHours(0, 0, 0, 0);
+
+    // คำนวณวันทำงานจากระยะเวลา หรือดึงจากตาราง attendance ถ้ามี
+    const workedDays = Math.max(1, Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
     const targetRound: 20 | 30 = 30;
-    const workedDays = 20;
     const isWindowOpen = true; 
-    const dailyWage = 520;
 
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
     const { data: monthLoans, error: fetchErr } = await supabase
@@ -72,8 +91,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "กรุณาระบุจำนวนเงินให้ถูกต้อง" }, { status: 400 });
     }
 
-    const dailyWage = 520;
-    const workedDays = 20; // 🔓 บังคับวันทำงานจำลองเพื่อทดสอบ
+    // ดึงโปรไฟล์และคำนวณวันทำงานแบบเดียวกัน
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", session.userId)
+      .single();
+
+    const dailyWage = Number(profile?.daily_rate || profile?.dailyRate) || 520;
+    
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    let startDate = new Date(year, month, 11);
+    if (now.getDate() < 11) {
+      startDate = new Date(year, month - 1, 11);
+    }
+    startDate.setHours(0, 0, 0, 0);
+    const workedDays = Math.max(1, Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
     const { data: monthLoans } = await supabase
@@ -95,7 +130,8 @@ export async function POST(request: Request) {
 
     const newTotalBorrowed = totalBorrowedThisMonth + loanAmount;
     let interestRate = 0;
-    if (newTotalBorrowed > 4000) {
+    // ปรับเกณฑ์ดอกเบี้ย 5% เริ่มตั้งแต่ยอด 3,000 บาทขึ้นไปตามเงื่อนไขระบบ
+    if (newTotalBorrowed >= 3000) {
       interestRate = 0.05;
     }
 
@@ -123,7 +159,7 @@ export async function POST(request: Request) {
       success: true,
       message: "ยื่นคำร้องกู้ยืมเงินสำเร็จ",
       loan: newLoan,
-      warningInterest: newTotalBorrowed >= 4000
+      warningInterest: newTotalBorrowed >= 3000
     }, { status: 200 });
 
   } catch (error: any) {

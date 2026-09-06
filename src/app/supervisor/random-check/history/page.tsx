@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
 export default function RandomCheckHistoryPage() {
@@ -8,15 +8,16 @@ export default function RandomCheckHistoryPage() {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // State สำหรับการกรองวันที่
+  // State สำหรับการกรอง
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [filterMode, setFilterMode] = useState<"today" | "7days" | "all" | "custom">("all");
+  const [selectedSite, setSelectedSite] = useState<string>("all");
+  const [filterMode, setFilterMode] = useState<"month" | "7days" | "today" | "all" | "custom">("all");
 
   // State สำหรับ Modal ดูรูปภาพขยาย
   const [activeGallery, setActiveGallery] = useState<{ images: string[]; currentIndex: number } | null>(null);
 
-  // Helper ฟังก์ชันหา YYYY-MM-DD ตามเวลาท้องถิ่น (Local Time)
+  // Helper ฟังก์ชันหา YYYY-MM-DD ตามเวลาท้องถิ่น
   const formatLocalDate = (d: Date) => {
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, "0");
@@ -65,8 +66,17 @@ export default function RandomCheckHistoryPage() {
     }
   };
 
+  // ดึงรายชื่อหน่วยงานทั้งหมดที่ไม่ซ้ำกันสำหรับใส่ Dropdown กรอง
+  const siteList = useMemo(() => {
+    const set = new Set<string>();
+    logs.forEach((item) => {
+      if (item.siteName) set.add(item.siteName);
+    });
+    return Array.from(set);
+  }, [logs]);
+
   // ปุ่มลัดเลือกช่วงเวลา
-  const handleQuickFilter = (mode: "today" | "7days" | "all") => {
+  const handleQuickFilter = (mode: "month" | "7days" | "today" | "all") => {
     setFilterMode(mode);
     const today = new Date();
     const todayStr = formatLocalDate(today);
@@ -79,14 +89,24 @@ export default function RandomCheckHistoryPage() {
       past7.setDate(today.getDate() - 6);
       setStartDate(formatLocalDate(past7));
       setEndDate(todayStr);
+    } else if (mode === "month") {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      setStartDate(formatLocalDate(firstDay));
+      setEndDate(todayStr);
     } else if (mode === "all") {
       setStartDate("");
       setEndDate("");
     }
   };
 
-  // ฟังก์ชันกรองรายการตามวันที่เลือก
+  // ฟังก์ชันกรองรายการ (ทั้งวันที่และหน่วยงาน)
   const filteredLogs = logs.filter((item) => {
+    // 1. กรองตามหน่วยงาน
+    if (selectedSite !== "all" && item.siteName !== selectedSite) {
+      return false;
+    }
+
+    // 2. กรองตามช่วงวันที่
     if (filterMode === "all" || (!startDate && !endDate)) return true;
 
     const rawDate = item.createdAt || item.date;
@@ -118,12 +138,8 @@ export default function RandomCheckHistoryPage() {
     setActiveGallery({ ...activeGallery, currentIndex: newIndex });
   };
 
-  // เปิด Modal รูปภาพ
   const openGallery = (images: string[], index: number) => {
-    setActiveGallery({
-      images,
-      currentIndex: index,
-    });
+    setActiveGallery({ images, currentIndex: index });
   };
 
   return (
@@ -144,56 +160,98 @@ export default function RandomCheckHistoryPage() {
 
       {/* Main Content */}
       <main className="max-w-md mx-auto px-4 mt-4 space-y-4">
-        {/* การ์ดค้นหาตามช่วงวันที่ */}
+        {/* การ์ดตัวกรองข้อมูล */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-3">
           <div className="flex justify-between items-center">
             <label className="text-xs font-bold text-slate-700 flex items-center space-x-1">
-              <span>📅</span>
-              <span>ค้นหาตามช่วงวันที่</span>
+              <span>🔍</span>
+              <span>ตัวกรองค้นหาประวัติ</span>
             </label>
-            <div className="flex space-x-1">
-              <button
-                type="button"
-                onClick={() => handleQuickFilter("today")}
-                className={`px-2 py-1 text-[10px] font-bold rounded-md transition cursor-pointer ${
-                  filterMode === "today"
-                    ? "bg-amber-500 text-slate-950 shadow-sm"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                วันนี้
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFilter("7days")}
-                className={`px-2 py-1 text-[10px] font-bold rounded-md transition cursor-pointer ${
-                  filterMode === "7days"
-                    ? "bg-amber-500 text-slate-950 shadow-sm"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                7 วันล่าสุด
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFilter("all")}
-                className={`px-2 py-1 text-[10px] font-bold rounded-md transition cursor-pointer ${
-                  filterMode === "all"
-                    ? "bg-amber-500 text-slate-950 shadow-sm"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                ดูทั้งหมด
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                handleQuickFilter("all");
+                setSelectedSite("all");
+              }}
+              className="text-[10px] text-amber-600 font-bold hover:underline cursor-pointer"
+            >
+              ล้างตัวกรอง
+            </button>
           </div>
 
+          {/* 1. ปุ่มเลือกช่วงเวลาด่วน */}
+          <div className="grid grid-cols-4 gap-1">
+            <button
+              type="button"
+              onClick={() => handleQuickFilter("month")}
+              className={`py-1.5 text-[10px] font-bold rounded-lg transition cursor-pointer text-center ${
+                filterMode === "month"
+                  ? "bg-amber-500 text-slate-950 shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              เดือนนี้
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickFilter("7days")}
+              className={`py-1.5 text-[10px] font-bold rounded-lg transition cursor-pointer text-center ${
+                filterMode === "7days"
+                  ? "bg-amber-500 text-slate-950 shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              7 วัน
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickFilter("today")}
+              className={`py-1.5 text-[10px] font-bold rounded-lg transition cursor-pointer text-center ${
+                filterMode === "today"
+                  ? "bg-amber-500 text-slate-950 shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              วันนี้
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickFilter("all")}
+              className={`py-1.5 text-[10px] font-bold rounded-lg transition cursor-pointer text-center ${
+                filterMode === "all"
+                  ? "bg-amber-500 text-slate-950 shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              ทั้งหมด
+            </button>
+          </div>
+
+          {/* 2. เลือกตามชื่อหน่วยงาน */}
+          <div>
+            <span className="text-[10px] text-slate-400 block mb-1 font-medium">หน่วยงาน:</span>
+            <select
+              value={selectedSite}
+              onChange={(e) => setSelectedSite(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 cursor-pointer"
+            >
+              <option value="all">🏢 หน่วยงานทั้งหมด</option>
+              {siteList.map((site, idx) => (
+                <option key={idx} value={site}>
+                  {site}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 3. ตั้งแต่วันที่ ถึง วันที่ (คลิกปุ๊บปฏิทินเด้งปั๊บ) */}
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div>
               <span className="text-[10px] text-slate-400 block mb-0.5 font-medium">ตั้งแต่วันที่:</span>
               <input
                 type="date"
                 value={startDate}
+                onClick={(e) => e.currentTarget.showPicker?.()}
                 onChange={(e) => {
                   setStartDate(e.target.value);
                   setFilterMode("custom");
@@ -206,6 +264,7 @@ export default function RandomCheckHistoryPage() {
               <input
                 type="date"
                 value={endDate}
+                onClick={(e) => e.currentTarget.showPicker?.()}
                 onChange={(e) => {
                   setEndDate(e.target.value);
                   setFilterMode("custom");
@@ -232,7 +291,7 @@ export default function RandomCheckHistoryPage() {
           <div className="text-center py-10 text-slate-500 text-xs animate-pulse">กำลังโหลดข้อมูล...</div>
         ) : filteredLogs.length === 0 ? (
           <div className="bg-white rounded-2xl p-8 text-center text-slate-400 text-xs shadow-sm border border-slate-200">
-            ไม่พบรายการการตรวจตราในช่วงเวลาที่เลือก
+            ไม่พบรายการการตรวจตราตามเงื่อนไขที่เลือก
           </div>
         ) : (
           filteredLogs.map((item) => (
@@ -241,9 +300,9 @@ export default function RandomCheckHistoryPage() {
                 <div className="flex items-center space-x-2">
                   <span className="text-base">👤</span>
                   <div>
-                    <span className="font-bold text-xs text-slate-800 block">{item.userName || "สมศักดิ์ มั่งมี"}</span>
+                    <span className="font-bold text-xs text-slate-800 block">{item.userName || "พนักงาน"}</span>
                     <span className="text-[10px] text-slate-400 font-medium">
-                      📅 {item.createdAtFormatted || item.createdAt || "19 ส.ค. 2569 16:08 น."}
+                      📅 {item.createdAtFormatted || item.createdAt}
                     </span>
                   </div>
                 </div>
@@ -251,6 +310,15 @@ export default function RandomCheckHistoryPage() {
                   <span>⏳</span>
                   <span>รอตรวจสอบ</span>
                 </span>
+              </div>
+
+              {/* หน่วยงานที่ตรวจสอบ */}
+              <div className="bg-amber-50/60 border border-amber-200/60 px-3 py-2 rounded-xl flex items-center gap-2">
+                <span className="text-sm">📍</span>
+                <div>
+                  <span className="text-[10px] text-slate-500 block leading-none font-medium">หน่วยงานที่ตรวจสอบ</span>
+                  <span className="text-xs font-bold text-slate-900">{item.siteName || "ไม่ระบุหน่วยงาน"}</span>
+                </div>
               </div>
 
               <p className="text-xs text-slate-700 leading-relaxed font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-100">
@@ -272,7 +340,7 @@ export default function RandomCheckHistoryPage() {
                           e.stopPropagation();
                           openGallery(item.images, idx);
                         }}
-                        className="aspect-square rounded-xl overflow-hidden border border-slate-300 shadow-sm cursor-pointer hover:opacity-80 active:scale-95 transition-all relative block w-full p-0 bg-slate-100"
+                        className="w-20 h-20 rounded-xl overflow-hidden border border-slate-300 shadow-sm cursor-pointer hover:opacity-80 active:scale-95 transition-all relative block p-0 bg-slate-100"
                       >
                         <img
                           src={imgUrl}
@@ -301,7 +369,7 @@ export default function RandomCheckHistoryPage() {
           onClick={() => setActiveGallery(null)}
           className="fixed inset-0 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-between p-4 z-[9999] animate-fadeIn select-none"
         >
-          <div className="w-full max-w-lg flex justify-between items-center text-white pt-2">
+          <div className="w-full max-w-2xl flex justify-between items-center text-white pt-2">
             <span className="text-xs font-mono bg-white/20 px-3 py-1 rounded-full">
               {activeGallery.currentIndex + 1} / {activeGallery.images.length}
             </span>
@@ -314,12 +382,12 @@ export default function RandomCheckHistoryPage() {
             </button>
           </div>
 
-          <div className="relative max-w-lg w-full flex items-center justify-center my-auto">
+          <div className="relative max-w-2xl w-full flex items-center justify-center my-auto px-10">
             {activeGallery.images.length > 1 && (
               <button
                 type="button"
                 onClick={handlePrevImage}
-                className="absolute left-2 z-10 bg-black/50 hover:bg-black/80 text-white w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold border border-white/20 transition cursor-pointer"
+                className="absolute left-0 z-10 bg-black/50 hover:bg-black/80 text-white w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold border border-white/20 transition cursor-pointer"
               >
                 ‹
               </button>
@@ -328,7 +396,7 @@ export default function RandomCheckHistoryPage() {
             <img
               src={activeGallery.images[activeGallery.currentIndex]}
               alt="enlarged-view"
-              className="max-h-[75vh] w-auto object-contain rounded-2xl shadow-2xl border border-white/10"
+              className="max-h-[80vh] h-auto w-auto object-contain rounded-2xl shadow-2xl border border-white/10 bg-black"
               onClick={(e) => e.stopPropagation()}
             />
 
@@ -336,7 +404,7 @@ export default function RandomCheckHistoryPage() {
               <button
                 type="button"
                 onClick={handleNextImage}
-                className="absolute right-2 z-10 bg-black/50 hover:bg-black/80 text-white w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold border border-white/20 transition cursor-pointer"
+                className="absolute right-0 z-10 bg-black/50 hover:bg-black/80 text-white w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold border border-white/20 transition cursor-pointer"
               >
                 ›
               </button>

@@ -2,19 +2,18 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { calculateLoanDetails } from "@/utils/loanCalculator";
 
 export default function SupervisorLoansPage() {
   const [loans, setLoans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [loanSummary, setLoanSummary] = useState({
-    targetRound: 20 as 20 | 30,
-    isWindowOpen: false,
-    workedDays: 10,
+    targetRound: 30 as 20 | 30,
+    isWindowOpen: true,
+    workedDays: 25,
     dailyWage: 520,
-    maxCredit: 0,
     totalBorrowedThisMonth: 0,
-    remainingCredit: 0,
   });
 
   const getTodayString = () => {
@@ -40,13 +39,11 @@ export default function SupervisorLoansPage() {
       if (data.success) {
         setLoans(data.loans || []);
         setLoanSummary({
-          targetRound: data.targetRound || 20,
-          isWindowOpen: data.isWindowOpen,
-          workedDays: data.workedDays || 10,
+          targetRound: data.targetRound || 30,
+          isWindowOpen: data.isWindowOpen ?? true,
+          workedDays: data.workedDays || 25,
           dailyWage: data.dailyWage || 520,
-          maxCredit: data.maxCredit || 0,
           totalBorrowedThisMonth: data.totalBorrowedThisMonth || 0,
-          remainingCredit: data.remainingCredit || 0,
         });
       }
     } catch (err) {
@@ -55,6 +52,20 @@ export default function SupervisorLoansPage() {
       setLoading(false);
     }
   };
+
+  // ใช้ฟังก์ชันกลางคำนวณวงเงินและดอกเบี้ยแบบเดียวกับหน้าแดชบอร์ด
+  const loanCalc = calculateLoanDetails({
+    baseDailyRate: loanSummary.dailyWage,
+    workedDaysThisCycle: loanSummary.workedDays,
+    requestedAmount: loanSummary.totalBorrowedThisMonth,
+    socialSecurity: 0,
+    tax: 0,
+  });
+
+  const maxCredit = loanCalc.maxQuota;
+  const remainingCredit = Math.max(0, maxCredit - loanSummary.totalBorrowedThisMonth);
+  const totalInterestAmount = loanCalc.interest;
+  const totalDeductionWithInterest = loanSummary.totalBorrowedThisMonth + totalInterestAmount;
 
   const setQuickDate = (type: "TODAY" | "LAST_7_DAYS" | "ALL") => {
     if (type === "TODAY") {
@@ -97,11 +108,6 @@ export default function SupervisorLoansPage() {
     return true;
   });
 
-  const totalInterestAmount = loanSummary.totalBorrowedThisMonth >= 4000 
-    ? loanSummary.totalBorrowedThisMonth * 0.05 
-    : 0;
-  const totalDeductionWithInterest = loanSummary.totalBorrowedThisMonth + totalInterestAmount;
-
   return (
     <div className="w-full min-h-screen bg-slate-100 pb-24">
       {/* Header */}
@@ -127,7 +133,7 @@ export default function SupervisorLoansPage() {
                 สิทธิ์กู้ยืมสูงสุด (85% ของค่าจ้าง {loanSummary.workedDays} วัน)
               </p>
               <h2 className="text-2xl font-extrabold text-amber-400 font-mono mt-0.5">
-                ฿{loanSummary.remainingCredit.toLocaleString()}
+                ฿{remainingCredit.toLocaleString()}
                 <span className="text-xs text-slate-300 font-normal ml-1">คงเหลือที่กู้ได้</span>
               </h2>
             </div>
@@ -149,7 +155,7 @@ export default function SupervisorLoansPage() {
             </div>
             <div className="bg-slate-800/60 p-2 rounded-xl">
               <span className="block text-[10px] text-slate-400">วงเงินกู้เต็มสิทธิ์</span>
-              <span className="font-bold text-white">฿{loanSummary.maxCredit.toLocaleString()}</span>
+              <span className="font-bold text-white">฿{maxCredit.toLocaleString()}</span>
             </div>
             <div className="bg-slate-800/60 p-2 rounded-xl">
               <span className="block text-[10px] text-slate-400">กู้ไปแล้วเดือนนี้</span>
@@ -177,7 +183,7 @@ export default function SupervisorLoansPage() {
             >
               🔒 นอกช่วงเวลายื่นกู้
             </button>
-          ) : loanSummary.remainingCredit <= 0 ? (
+          ) : remainingCredit <= 0 ? (
             <button
               disabled
               title="คุณใช้สิทธิ์กู้ยืมเต็มวงเงินของรอบนี้แล้ว"
@@ -195,15 +201,15 @@ export default function SupervisorLoansPage() {
           )}
         </div>
 
-        {/* แจ้งเตือนเรื่องการคิดดอกเบี้ย */}
-        {loanSummary.totalBorrowedThisMonth >= 4000 && (
+        {/* แจ้งเตือนเรื่องการคิดดอกเบี้ย (ยอดตั้งแต่ 3,000 บาทขึ้นไป) */}
+        {loanSummary.totalBorrowedThisMonth >= 3000 && (
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-amber-900 text-xs space-y-1.5 shadow-sm">
             <div className="flex items-center gap-1.5 font-bold text-amber-900">
               <span className="text-base">⚠️</span>
               <span>แจ้งเตือนคำนวณดอกเบี้ยกู้ยืม (คิดดอกเบี้ย 5%)</span>
             </div>
             <p className="text-[11px] text-amber-800 leading-relaxed">
-              ยอดกู้สะสมในเดือนนี้รวม <strong>฿{loanSummary.totalBorrowedThisMonth.toLocaleString()}</strong> (เข้าเกณฑ์ตั้งแต่ 4,000 บาทขึ้นไป)
+              ยอดกู้สะสมในเดือนนี้รวม <strong>฿{loanSummary.totalBorrowedThisMonth.toLocaleString()}</strong> (เข้าเกณฑ์ตั้งแต่ 3,000 บาทขึ้นไป)
             </p>
             <div className="p-2 bg-amber-100/70 rounded-xl space-y-1 text-[11px] font-mono border border-amber-200/80">
               <div className="flex justify-between">
@@ -257,6 +263,7 @@ export default function SupervisorLoansPage() {
               <input
                 type="date"
                 value={fromDate}
+                onClick={(e) => e.currentTarget.showPicker?.()}
                 onChange={(e) => setFromDate(e.target.value)}
                 className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-amber-500 cursor-pointer"
               />
@@ -266,6 +273,7 @@ export default function SupervisorLoansPage() {
               <input
                 type="date"
                 value={toDate}
+                onClick={(e) => e.currentTarget.showPicker?.()}
                 onChange={(e) => setToDate(e.target.value)}
                 className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-amber-500 cursor-pointer"
               />
@@ -295,9 +303,16 @@ export default function SupervisorLoansPage() {
             <div className="space-y-3">
               {filteredLoans.map((item) => {
                 const amount = Number(item.amount) || 0;
-                const isOverInterestThreshold = loanSummary.totalBorrowedThisMonth >= 4000;
-                const interestAmount = isOverInterestThreshold ? amount * 0.05 : 0;
-                const totalDeduction = amount + interestAmount;
+                const itemCalc = calculateLoanDetails({
+                  baseDailyRate: loanSummary.dailyWage,
+                  workedDaysThisCycle: loanSummary.workedDays,
+                  requestedAmount: amount,
+                  socialSecurity: 0,
+                  tax: 0,
+                });
+                const isOverInterestThreshold = amount >= 3000;
+                const interestAmount = itemCalc.interest;
+                const totalDeduction = itemCalc.totalDeductionOnPayday;
                 const createdAt = item.created_at || item.createdAt;
 
                 return (
@@ -385,16 +400,20 @@ export default function SupervisorLoansPage() {
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-2 py-2 flex justify-around items-center z-50 shadow-lg max-w-md mx-auto">
         <Link href="/supervisor/dashboard" className="flex flex-col items-center text-slate-400 hover:text-amber-400 text-[10px] font-semibold transition">
-          <span className="text-base mb-0.5">📊</span>แดชบอร์ด
+          <span className="text-base mb-0.5">📊</span>
+          แดชบอร์ด
         </Link>
-        <Link href="/supervisor/apply-leave" className="flex flex-col items-center text-slate-400 hover:text-amber-400 text-[10px] font-semibold transition">
-          <span className="text-base mb-0.5">📝</span>ระบบลา
+        <Link href="/supervisor/random-check" className="flex flex-col items-center text-slate-400 hover:text-amber-400 text-[10px] font-semibold transition">
+          <span className="text-base mb-0.5">📍</span>
+          สุ่มตรวจ
         </Link>
-        <Link href="/supervisor/attendance" className="flex flex-col items-center text-slate-400 hover:text-amber-400 text-[10px] font-semibold transition">
-          <span className="text-base mb-0.5">⏱️</span>ลงเวลาทำงาน
+        <Link href="/supervisor/logbook" className="flex flex-col items-center text-slate-400 hover:text-amber-400 text-[10px] font-semibold transition">
+          <span className="text-base mb-0.5">📋</span>
+          Logbook
         </Link>
-        <Link href="/supervisor/shifts" className="flex flex-col items-center text-slate-400 hover:text-amber-400 text-[10px] font-semibold transition">
-          <span className="text-base mb-0.5">📅</span>ตารางเวร
+        <Link href="/supervisor/leaves" className="flex flex-col items-center text-slate-400 hover:text-amber-400 text-[10px] font-semibold transition">
+          <span className="text-base mb-0.5">📄</span>
+          อนุมัติลา
         </Link>
       </nav>
     </div>

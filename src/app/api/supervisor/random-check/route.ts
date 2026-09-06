@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 
-// 1. GET: ดึงประวัติจากตาราง random_checks
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+// 1. GET: ดึงประวัติจากตาราง random_checks พร้อมเชื่อมข้อมูลหน่วยงาน
 export async function GET() {
   try {
     const session = await getSession();
@@ -47,7 +50,7 @@ export async function GET() {
   }
 }
 
-// 2. POST: บันทึกลงตาราง random_checks
+// 2. POST: บันทึกลงตาราง random_checks พร้อมชื่อหน่วยงานจริงจากฐานข้อมูล
 export async function POST(req: Request) {
   try {
     const session = await getSession();
@@ -65,7 +68,7 @@ export async function POST(req: Request) {
     const newCheck = await (prisma as any).randomCheck.create({
       data: {
         userId: session.userId,
-        siteName: siteName || "หน่วยงานทั่วไป",
+        siteName: siteName || "สำนักงานใหญ่",
         details: details.trim(),
         latitude: Number(latitude) || 0,
         longitude: Number(longitude) || 0,
