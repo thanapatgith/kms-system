@@ -18,7 +18,6 @@ export async function GET() {
       }
     }
 
-    // [ปรับปรุง] ถ้าหา Session ไม่เจอ ให้ดึงบัญชีที่มี role เป็น CLIENT คนแรกในระบบมาสำรองแบบไดนามิก
     if (!currentUsername) {
       const fallbackClient = (await prisma.$queryRaw`
         SELECT username FROM users WHERE role = 'CLIENT' LIMIT 1
@@ -27,22 +26,22 @@ export async function GET() {
       currentUsername = fallbackClient[0]?.username || "";
     }
 
-    // 1. ดึงข้อมูลผู้ใช้ปัจจุบันเพื่อเอา site_id
     const currentUserList = (await prisma.$queryRaw`
-      SELECT id, username, name, role, site_id 
-      FROM users 
-      WHERE username = ${currentUsername} 
+      SELECT u.id, u.username, u.name, u.role, u.site_id, s.id as site_primary_id, s.site_name, s.client_id
+      FROM users u
+      LEFT JOIN sites s ON u.site_id = s.id
+      WHERE u.username = ${currentUsername} 
       LIMIT 1
     `.catch(() => [])) as any[];
 
     const currentUser = currentUserList[0];
     const siteId = currentUser?.site_id;
+    const clientId = currentUser?.client_id;
 
     let siteName = "หน่วยงานในความดูแล";
     let guardsCount = 0;
 
     if (siteId) {
-      // 2. ดึงชื่อไซต์งานจากตาราง sites
       const siteList = (await prisma.$queryRaw`
         SELECT id, site_name FROM sites WHERE id = ${siteId} LIMIT 1
       `.catch(() => [])) as any[];
@@ -51,7 +50,6 @@ export async function GET() {
         siteName = siteList[0].site_name;
       }
 
-      // 3. นับจำนวน รปภ. จริงโดยกรองเฉพาะ role ที่เป็นพนักงาน/หัวหน้าชุด (ตัด CLIENT ออก)
       const guardsResult = (await prisma.$queryRaw`
         SELECT COUNT(id) as count 
         FROM users 
@@ -62,36 +60,58 @@ export async function GET() {
       guardsCount = Number(guardsResult[0]?.count || 0);
     }
 
-    // 4. ดึงรายงาน Logbook ของไซต์นี้
+    let clientRecord = null;
+    if (clientId) {
+      clientRecord = await prisma.client.findUnique({
+        where: { id: clientId },
+      }).catch(() => null);
+    }
+
+    // ดึงรายงานจากตาราง incident_reports ให้ตรงกับหน้ารายงานจริง
     let reportsRaw: any[] = [];
     if (siteId) {
-      reportsRaw = await prisma.logbook.findMany({
-        where: { siteId: siteId },
-        orderBy: { createdAt: "desc" },
-      }).catch(() => []);
+      reportsRaw = (await prisma.$queryRaw`
+        SELECT r.*, u.name as emp_name, u.employee_code, u.username as emp_username, s.site_name
+        FROM incident_reports r
+        LEFT JOIN users u ON r.user_id = u.id
+        LEFT JOIN sites s ON r.site_id = s.id
+        WHERE r.site_id = ${siteId}
+        ORDER BY r.created_at DESC
+      `.catch(() => [])) as any[];
+    }
+
+    if (reportsRaw.length === 0) {
+      reportsRaw = (await prisma.$queryRaw`
+        SELECT r.*, u.name as emp_name, u.employee_code, u.username as emp_username, s.site_name
+        FROM incident_reports r
+        LEFT JOIN users u ON r.user_id = u.id
+        LEFT JOIN sites s ON r.site_id = s.id
+        ORDER BY r.created_at DESC
+      `.catch(() => [])) as any[];
     }
 
     const reports = reportsRaw.map((r: any) => ({
       id: r.id,
       title: r.message ? r.message.substring(0, 40) + "..." : "รายงานการปฏิบัติงาน",
       content: r.message,
-      siteName: siteName,
+      siteName: r.site_name || siteName,
       isAcknowledged: r.status === "ACKNOWLEDGED",
-      createdAt: r.createdAt,
+      createdAt: r.created_at || r.createdAt,
+      images: r.images || [],
       comments: []
     }));
 
     return NextResponse.json({
       success: true,
       client: {
-        companyName: siteName,
-        contractNumber: "CNT-2026-001",
-        contactPerson: currentUser?.name || "ผู้ดูแลโครงการ",
-        contactPhone: "02-XXX-XXXX",
-        accountantName: "-",
-        accountantPhone: "-",
-        billingCycle: "ทุกสิ้นเดือน",
-        monthlyFee: 0,
+        companyName: clientRecord?.companyName || siteName,
+        contractNumber: clientRecord?.contractNumber || "CNT-2026-001",
+        contactPerson: clientRecord?.contactPerson || currentUser?.name || "ผู้ดูแลโครงการ",
+        contactPhone: clientRecord?.contactPhone || "02-XXX-XXXX",
+        accountantName: clientRecord?.accountantName || "-",
+        accountantPhone: clientRecord?.accountantPhone || "-",
+        billingCycle: "ทุกวันที่ 10 ของเดือน",
+        monthlyFee: clientRecord?.monthlyFee || 45800,
         sitesCount: siteId ? 1 : 0,
         guardsCount: guardsCount,
       },

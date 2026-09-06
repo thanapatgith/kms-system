@@ -10,6 +10,9 @@ export default function EmployeeAttendancePage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [location, setLocation] = useState<{ lat: number | null; lng: number | null }>({ lat: null, lng: null });
   
+  const [branchesList, setBranchesList] = useState<string[]>([]);
+  const [selectedBranch, setSelectedBranch] = useState("");
+
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -20,6 +23,8 @@ export default function EmployeeAttendancePage() {
 
   useEffect(() => {
     fetchAttendance();
+    fetchSites();
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -31,9 +36,8 @@ export default function EmployeeAttendancePage() {
         (error) => {
           console.error("Geolocation error:", error);
           setErrorMsg("ไม่สามารถดึงตำแหน่ง GPS ได้ กรุณาเปิดใช้งาน Location ในเบราว์เซอร์");
-          setLocation({ lat: 13.8305, lng: 100.6179 });
         },
-        { enableHighAccuracy: true }
+        { enableHighAccuracy: true, timeout: 15000 }
       );
     }
 
@@ -53,6 +57,24 @@ export default function EmployeeAttendancePage() {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const fetchSites = async () => {
+    try {
+      const res = await fetch("/api/employee/attendance?action=sites", { cache: "no-store" });
+      const data = await res.json();
+      if (data.ok && data.branches) {
+        setBranchesList(data.branches);
+        setSelectedBranch(data.defaultBranch || data.branches[0]);
+      } else {
+        setBranchesList(["หน่วยงานทั่วไป"]);
+        setSelectedBranch("หน่วยงานทั่วไป");
+      }
+    } catch (err) {
+      console.error("Failed to fetch sites:", err);
+      setBranchesList(["หน่วยงานทั่วไป"]);
+      setSelectedBranch("หน่วยงานทั่วไป");
     }
   };
 
@@ -139,7 +161,12 @@ export default function EmployeeAttendancePage() {
 
   const handleAttendance = async (type: "CHECK_IN" | "CHECK_OUT") => {
     if (location.lat === null || location.lng === null) {
-      setErrorMsg("กำลังรอพิกัด GPS หรือไม่ได้รับอนุญาตให้เข้าถึงตำแหน่ง กรุณาเปิด GPS และรีเฟรชหน้าเว็บ");
+      setErrorMsg("ยังไม่พบพิกัด GPS กรุณารอสักครู่หรือเปิดใช้งาน GPS ในเบราว์เซอร์");
+      return;
+    }
+
+    if (!selectedBranch) {
+      setErrorMsg("กรุณาเลือกหน่วยงานที่ปฏิบัติงาน");
       return;
     }
 
@@ -155,6 +182,7 @@ export default function EmployeeAttendancePage() {
     try {
       const formData = new FormData();
       formData.append("type", type);
+      formData.append("branch", selectedBranch);
       formData.append("latitude", location.lat.toString());
       formData.append("longitude", location.lng.toString());
       formData.append("images", selectedImage);
@@ -214,6 +242,24 @@ export default function EmployeeAttendancePage() {
 
         <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 space-y-4">
           
+          {/* เลือกหน่วยงาน */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-800 flex justify-between items-center">
+              <span>📍 เลือกหน่วยงานที่ปฏิบัติงาน *</span>
+            </label>
+            <select
+              value={selectedBranch}
+              onChange={(e) => setSelectedBranch(e.target.value)}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-orange-500 outline-none cursor-pointer"
+            >
+              {branchesList.map((branch, idx) => (
+                <option key={idx} value={branch}>
+                  {branch}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* พิกัด GPS แบบตัวอักษร Lat/Long */}
           <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 flex flex-col gap-1 text-xs text-slate-600 shadow-inner">
             <span className="font-bold text-slate-500">📍 พิกัด GPS ยืนยันตำแหน่ง:</span>
@@ -296,7 +342,7 @@ export default function EmployeeAttendancePage() {
         </div>
       </main>
 
-      {/* Modal เปิดกล้องสด ล็อกสัดส่วน 3:4 แท้แน่นอน */}
+      {/* Modal เปิดกล้องสด */}
       {showCameraModal && (
         <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-between p-4 pb-24">
           <div className="w-full flex justify-between items-center text-white py-1">
@@ -312,7 +358,6 @@ export default function EmployeeAttendancePage() {
             </button>
           </div>
 
-          {/* ช่องแสดงวิดีโอกล้องสด ล็อกสัดส่วน 3:4 เป๊ะๆ ด้วย aspect-[3/4] */}
           <div className="relative w-full max-w-[280px] aspect-[3/4] flex items-center justify-center overflow-hidden rounded-2xl bg-black my-auto shadow-2xl border border-slate-700">
             <video
               ref={videoRef}
@@ -322,20 +367,13 @@ export default function EmployeeAttendancePage() {
               className="absolute inset-0 w-full h-full object-cover"
             ></video>
 
-            {/* กรอบสี่เหลี่ยมไกด์ไลน์ 3:4 */}
             <div className="absolute inset-4 border-2 border-white/80 rounded-xl pointer-events-none flex flex-col items-center justify-center bg-black/10">
-              
-              {/* เส้นโครงร่างคนครึ่งตัว (SVG Half-body Wireframe) */}
               <div className="relative w-24 h-36 mb-2 flex items-center justify-center">
                 <svg className="w-full h-full text-emerald-400 opacity-90" viewBox="0 0 100 130" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4">
-                  {/* ศีรษะ */}
                   <ellipse cx="50" cy="25" rx="18" ry="22" />
-                  {/* หัวไหล่และลำตัวครึ่งบน */}
                   <path d="M 18 115 C 18 75, 32 60, 50 60 C 68 60, 82 75, 82 115" />
                 </svg>
               </div>
-
-              {/* แถบข้อความคำแนะนำด้านล่าง */}
               <div className="bg-emerald-800/85 text-emerald-100 text-[10px] font-bold px-3 py-1 rounded-full border border-emerald-400 shadow-lg">
                 กรุณาจัดตำแหน่งให้อยู่ในกรอบ
               </div>
@@ -344,7 +382,6 @@ export default function EmployeeAttendancePage() {
 
           <canvas ref={canvasRef} className="hidden"></canvas>
 
-          {/* ปุ่มชัตเตอร์ถ่ายรูป (ขยับขึ้นมาด้านบนพ้นแถบเมนูด้านล่าง) */}
           <div className="w-full max-w-md pb-2 flex justify-center items-center">
             <button
               onClick={capturePhoto}
@@ -360,16 +397,20 @@ export default function EmployeeAttendancePage() {
       <div className="fixed bottom-14 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 shadow-lg z-40">
         <div className="max-w-md mx-auto space-y-2">
           
-          {!selectedImage && (
+          {location.lat === null || location.lng === null ? (
+            <div className="text-[11px] text-center text-amber-600 font-bold bg-amber-50 py-1.5 px-3 rounded-lg border border-amber-200 flex items-center justify-center gap-1 animate-pulse">
+              <span>📍 กำลังรอพิกัด GPS... กรุณารอสักครู่</span>
+            </div>
+          ) : !selectedImage ? (
             <div className="text-[11px] text-center text-red-600 font-bold bg-red-50 py-1.5 px-3 rounded-lg border border-red-200 flex items-center justify-center gap-1">
               <span>⚠️ กรุณาถ่ายรูปผู้มารับช่วงต่อด้านบนก่อนกดลงเวลา</span>
             </div>
-          )}
+          ) : null}
 
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => handleAttendance("CHECK_IN")}
-              disabled={loading || location.lat === null || !selectedImage || isWorking}
+              disabled={loading || location.lat === null || location.lng === null || !selectedImage || isWorking}
               className="py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer disabled:opacity-50 disabled:bg-slate-400 flex flex-col items-center justify-center gap-0.5"
             >
               <span>🟢 เช็คอินเข้างาน</span>
@@ -377,7 +418,7 @@ export default function EmployeeAttendancePage() {
             </button>
             <button
               onClick={() => handleAttendance("CHECK_OUT")}
-              disabled={loading || location.lat === null || !selectedImage || !isWorking}
+              disabled={loading || location.lat === null || location.lng === null || !selectedImage || !isWorking}
               className="py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer disabled:opacity-50 disabled:bg-slate-400 flex flex-col items-center justify-center gap-0.5"
             >
               <span>🔴 เช็คเอาท์ออกงาน</span>

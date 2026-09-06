@@ -28,10 +28,12 @@ model Client {
   accountantName  String?  @map("accountant_name")
   accountantPhone String?  @map("accountant_phone")
   monthlyFee      Float?   @map("monthly_fee")
+  contractUrl     String?  @map("contract_url") // เพิ่มฟิลด์สำหรับเก็บ URL สัญญา
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   sites           Site[]
+  invoices        Invoice[]
 
   @@map("clients")
 }
@@ -159,12 +161,12 @@ model LeaveRequest {
 }
 
 model WebContent {
-  id         String   @id @default(cuid())
-  sectionKey String   @unique @map("section_key")
-  contentJson Json    @map("content_json")
-  bgImageUrl String?  @map("bg_image_url")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(cuid())
+  sectionKey  String   @unique @map("section_key")
+  contentJson Json     @map("content_json")
+  bgImageUrl  String?  @map("bg_image_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("web_contents")
 }
@@ -279,4 +281,40 @@ model RandomCheck {
 
   @@index([userId])
   @@map("random_checks")
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  clientId      String        @map("client_id")
+  invoiceNumber String        @map("invoice_number")
+  billingMonth  String        @map("billing_month")
+  subtotal      Float
+  vat           Float
+  totalAmount   Float         @map("total_amount")
+  dueDate       DateTime      @map("due_date")
+  status        String        @default("PENDING")
+  slipUrl       String?       @map("slip_url")
+  paidAt        DateTime?     @map("paid_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  items         InvoiceItem[]
+
+  @@index([clientId])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String   @map("invoice_id")
+  description String
+  quantity    Int
+  unitPrice   Float    @map("unit_price")
+  totalPrice  Float    @map("total_price")
+
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_items")
 }

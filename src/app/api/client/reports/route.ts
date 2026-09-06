@@ -55,66 +55,45 @@ export async function GET(request: Request) {
     const availableSites = siteList.map((s: any) => s.site_name);
     const companyName = availableSites[0] || "อมตะ";
 
-    // 3. กำหนดเงื่อนไขกรองรายงาน (บังคับให้ดึงเฉพาะ siteId ของลูกค้าคนนี้เท่านั้น)
-    let whereClause: any = {
-      siteId: clientSiteId
-    };
+    // 3. ดึงรายงานจากตาราง incident_reports ที่ตรงกับ site_id นี้เท่านั้น
+    let queryStr = `
+      SELECT r.*, u.name as emp_name, u.employee_code, u.username as emp_username, s.site_name
+      FROM incident_reports r
+      LEFT JOIN users u ON r.user_id = u.id
+      LEFT JOIN sites s ON r.site_id = s.id
+      WHERE r.site_id = '${clientSiteId}'
+    `;
 
-    // ถ้าระบุตัวกรองหน่วยงานเฉพาะเจาะจง
-    if (selectedSite !== "all") {
-      const matchedSite = siteList.find((s: any) => s.site_name === selectedSite);
-      if (matchedSite) {
-        whereClause.siteId = matchedSite.id;
-      }
-    }
-
-    // กรองตามช่วงเวลา
+    // กรองตามช่วงเวลาเพิ่มเติมถ้ามี
     const now = new Date();
     if (filter === "today") {
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      whereClause.createdAt = { gte: startOfDay };
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      queryStr += ` AND r.created_at >= '${startOfDay}'`;
     } else if (filter === "7days") {
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      whereClause.createdAt = { gte: sevenDaysAgo };
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      queryStr += ` AND r.created_at >= '${sevenDaysAgo}'`;
     } else if (filter === "custom" && startDate && endDate) {
-      whereClause.createdAt = {
-        gte: new Date(startDate),
-        lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
-      };
+      const startStr = new Date(startDate).toISOString();
+      const endStr = new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString();
+      queryStr += ` AND r.created_at >= '${startStr}' AND r.created_at <= '${endStr}'`;
     }
 
-    // 4. ดึงรายงาน Logbook พร้อมข้อมูลพนักงานที่รายงาน
-    const reportsRaw = await prisma.logbook.findMany({
-      where: whereClause,
-      orderBy: { createdAt: "desc" },
-    }).catch(() => []);
+    queryStr += ` ORDER BY r.created_at DESC`;
 
-    // ดึงข้อมูลพนักงานทั้งหมดที่เกี่ยวข้องเพื่อเอาชื่อและรหัสพนักงาน
-    const employeeIds = Array.from(new Set(reportsRaw.map((r: any) => r.userId).filter(Boolean)));
-    let employeeMap = new Map();
-    if (employeeIds.length > 0) {
-      const employees = await prisma.user.findMany({
-        where: { id: { in: employeeIds } },
-        select: { id: true, name: true, employeeCode: true, username: true }
-      }).catch(() => []);
-      employeeMap = new Map(employees.map((e: any) => [e.id, e]));
-    }
+    const reportsRaw = (await prisma.$queryRawUnsafe(queryStr).catch(() => [])) as any[];
 
-    const reports = reportsRaw.map((r: any) => {
-      const emp = r.userId ? employeeMap.get(r.userId) : null;
-      return {
-        id: r.id,
-        title: r.message ? r.message.substring(0, 40) + "..." : "รายงานการปฏิบัติงาน",
-        content: r.message,
-        siteName: siteMap.get(r.siteId) || "หน่วยงานในความดูแล",
-        isAcknowledged: r.status === "ACKNOWLEDGED",
-        createdAt: r.createdAt,
-        images: r.images || [],
-        employeeName: emp?.name || r.reporterName || "เจ้าหน้าที่ปฏิบัติงาน",
-        employeeCode: emp?.employeeCode || emp?.username || "KMS-GUARD",
-        comments: [] // สามารถเชื่อมโยงตารางคอมเมนต์เพิ่มเติมได้ตามโครงสร้างจริง
-      };
-    });
+    const reports = reportsRaw.map((r: any) => ({
+      id: r.id,
+      title: r.message ? r.message.substring(0, 40) + "..." : "รายงานการปฏิบัติงาน",
+      content: r.message,
+      siteName: r.site_name || siteMap.get(r.site_id) || "หน่วยงานในความดูแล",
+      isAcknowledged: r.status === "ACKNOWLEDGED",
+      createdAt: r.created_at || r.createdAt,
+      images: r.images || [],
+      employeeName: r.emp_name || "เจ้าหน้าที่ปฏิบัติงาน",
+      employeeCode: r.employee_code || r.emp_username || "KMS-GUARD",
+      comments: []
+    }));
 
     return NextResponse.json({
       success: true,

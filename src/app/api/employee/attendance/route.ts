@@ -6,15 +6,13 @@ import { uploadAttendanceImage } from "@/lib/supabaseStorage";
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// ฟังก์ชันสำหรับแปลงเวลาปัจจุบันให้เป็นเวลาประเทศไทย (UTC+7)
 function getThaiCurrentDate() {
   const now = new Date();
-  // ดึงเวลาปัจจุบันในโซน Asia/Bangkok
   const thaiTimeString = now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
   return new Date(thaiTimeString);
 }
 
-// 1. ดึงประวัติการลงเวลาของพนักงาน (GET)
+// 1. ดึงประวัติการลงเวลา หรือดึงรายชื่อหน่วยงาน (GET)
 export async function GET(req: Request) {
   try {
     const session = await getSession();
@@ -22,6 +20,39 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: "ไม่ได้เข้าสู่ระบบ" }, { status: 401 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const action = searchParams.get("action");
+
+    // เพิ่มส่วนนี้เข้าไป: ถ้าหน้าบ้านขอรายชื่อหน่วยงาน ให้ดึงส่งกลับไปให้ Dropdown
+    if (action === "sites") {
+      const userList = (await prisma.$queryRaw`
+        SELECT site_id FROM users WHERE id = ${session.userId} LIMIT 1
+      `.catch(() => [])) as any[];
+
+      const userSiteId = userList[0]?.site_id;
+      let sitesList: any[] = [];
+
+      if (userSiteId) {
+        const sites = (await prisma.$queryRaw`
+          SELECT id, site_name FROM sites WHERE id = ${userSiteId} LIMIT 1
+        `.catch(() => [])) as any[];
+
+        if (sites.length > 0) {
+          sitesList = [{ id: sites[0].id, name: sites[0].site_name }];
+        }
+      }
+
+      if (sitesList.length === 0) {
+        const allSites = (await prisma.$queryRaw`
+          SELECT id, site_name FROM sites ORDER BY site_name ASC
+        `.catch(() => [])) as any[];
+        sitesList = allSites.map((s: any) => ({ id: s.id, name: s.site_name }));
+      }
+
+      return NextResponse.json({ ok: true, sites: sitesList });
+    }
+
+    // โค้ดเดิม: ดึงประวัติการลงเวลา
     const attendances = await prisma.attendance.findMany({
       where: { userId: session.userId },
       orderBy: { createdAt: "asc" },
@@ -87,7 +118,7 @@ export async function GET(req: Request) {
   }
 }
 
-// 2. บันทึกเช็คอิน / เช็คเอาท์ พร้อมพิกัดและอัปโหลดรูปภาพขึ้น Supabase Storage (POST)
+// 2. บันทึกเช็คอิน / เช็คเอาท์ พร้อมพิกัดและ siteId (POST)
 export async function POST(req: Request) {
   try {
     const session = await getSession();
@@ -97,6 +128,7 @@ export async function POST(req: Request) {
 
     const formData = await req.formData();
     const type = formData.get("type") as string;
+    const siteId = formData.get("siteId") as string; // รับค่า siteId ที่ส่งมาจากหน้าบ้าน
     const latitude = formData.get("latitude");
     const longitude = formData.get("longitude");
     const imageFiles = formData.getAll("images") as File[];
@@ -109,7 +141,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "กรุณาแนบรูปภาพอย่างน้อย 1 รูป" }, { status: 400 });
     }
 
-    // ใช้เวลาประเทศไทยในการตรวจสอบกะวันนี้
     const thaiNow = getThaiCurrentDate();
     const todayStart = new Date(thaiNow);
     todayStart.setHours(0, 0, 0, 0);
@@ -132,7 +163,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "คุณยังไม่ได้เช็คอินเข้างาน ไม่สามารถเช็คเอาท์ได้" }, { status: 400 });
     }
 
-    // อัปโหลดรูปภาพขึ้น Supabase Storage
     const imageUrls: string[] = [];
 
     for (const file of imageFiles) {
@@ -145,15 +175,16 @@ export async function POST(req: Request) {
       }
     }
 
-    // บันทึกลงฐานข้อมูลโดยระบุเวลา createdAt เป็นเวลาประเทศไทย (thaiNow)
+    // บันทึกลงฐานข้อมูล (เพิ่ม siteId เข้าไปบันทึกด้วย)
     const newAttendance = await prisma.attendance.create({
       data: {
         userId: session.userId,
+        siteId: siteId || null, // บันทึกรหัสหน่วยงาน
         type: type,
         latitude: Number(latitude),
         longitude: Number(longitude),
         images: imageUrls,
-        createdAt: thaiNow, // บันทึกเวลาไทยตรงๆ
+        createdAt: thaiNow,
       },
     });
 
