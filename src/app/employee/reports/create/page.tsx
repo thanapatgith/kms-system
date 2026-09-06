@@ -14,7 +14,6 @@ export default function CreateReportPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // State สำหรับหน่วยงาน
   const [selectedBranch, setSelectedBranch] = useState("");
   const [branchesList, setBranchesList] = useState<string[]>([]);
 
@@ -39,12 +38,11 @@ export default function CreateReportPage() {
 
   const fetchUserProfile = async () => {
     try {
-      const res = await fetch("/api/employee/profile");
+      const res = await fetch("/api/employee/reports?action=sites");
       const data = await res.json();
-      if (data.ok && data.user?.branch) {
-        const userBranch = data.user.branch;
-        setSelectedBranch(userBranch);
-        setBranchesList([userBranch]);
+      if (data.ok && data.branches) {
+        setBranchesList(data.branches);
+        setSelectedBranch(data.defaultBranch || data.branches[0]);
       } else {
         setBranchesList(["หน่วยงานทั่วไป"]);
         setSelectedBranch("หน่วยงานทั่วไป");
@@ -56,7 +54,6 @@ export default function CreateReportPage() {
     }
   };
 
-  // ฟังก์ชันช่วยย่อและบีบอัดรูปภาพฝั่ง Client ก่อนอัปโหลด
   const compressImage = (file: File): Promise<File> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -69,7 +66,6 @@ export default function CreateReportPage() {
           let width = img.width;
           let height = img.height;
 
-          // กำหนดขนาด maxWidth / maxHeight สูงสุด (เช่น 1200 พิกเซล) เพื่อลดขนาดไฟล์
           const MAX_WIDTH = 1200;
           const MAX_HEIGHT = 1200;
 
@@ -90,7 +86,6 @@ export default function CreateReportPage() {
           const ctx = canvas.getContext("2d");
           ctx?.drawImage(img, 0, 0, width, height);
 
-          // แปลงภาพเป็นไฟล์ JPEG ที่คุณภาพ 0.8 (80%) ซึ่งขนาดจะลดลงมากแต่ภาพยังคมชัด
           canvas.toBlob(
             (blob) => {
               if (blob) {
@@ -100,7 +95,7 @@ export default function CreateReportPage() {
                 });
                 resolve(compressedFile);
               } else {
-                resolve(file); // ถ้าบีบอัดไม่สำเร็จ ให้ใช้ไฟล์เดิม
+                resolve(file);
               }
             },
             "image/jpeg",
@@ -117,9 +112,7 @@ export default function CreateReportPage() {
       setLoading(true);
 
       try {
-        // ทำการบีบอัดทุกรูปภาพที่ผู้ใช้เลือกเข้ามาพร้อมกัน
         const compressedFiles = await Promise.all(selectedFiles.map((file) => compressImage(file)));
-
         const newImages = [...images, ...compressedFiles];
         setImages(newImages);
 
@@ -185,7 +178,6 @@ export default function CreateReportPage() {
 
   return (
     <div className="w-full min-h-screen bg-slate-100 pb-24">
-      {/* Header */}
       <header className="bg-slate-900 text-white shadow-md sticky top-0 z-50">
         <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/employee/reports" className="text-xs text-slate-300 hover:text-white font-bold flex items-center gap-1">
@@ -196,9 +188,7 @@ export default function CreateReportPage() {
         </div>
       </header>
 
-      {/* Main Form */}
       <main className="max-w-md mx-auto px-4 mt-4 space-y-4">
-        
         {errorMsg && (
           <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-semibold text-center">
             {errorMsg}
@@ -206,8 +196,6 @@ export default function CreateReportPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          
-          {/* ส่วนระบุหน่วยงาน/สถานที่ปฏิบัติงาน */}
           <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 space-y-2">
             <label className="block text-xs font-bold text-slate-800 flex justify-between items-center">
               <span>📍 เลือกหน่วยงานที่ปฏิบัติงาน *</span>
@@ -228,7 +216,6 @@ export default function CreateReportPage() {
             </select>
           </div>
 
-          {/* 1. รูปภาพประกอบ */}
           <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 space-y-3">
             <label className="block text-xs font-bold text-slate-800">
               📸 รูปภาพประกอบการตรวจตรา *
@@ -266,7 +253,6 @@ export default function CreateReportPage() {
             </label>
           </div>
 
-          {/* 2. ข้อความด่วน */}
           <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 space-y-2.5">
             <label className="block text-xs font-bold text-slate-800">
               ⚡ ข้อความด่วน (กดเลือกได้เลย)
@@ -303,7 +289,6 @@ export default function CreateReportPage() {
             </div>
           </div>
 
-          {/* 3. ช่องกรอกรายละเอียดข้อความ */}
           <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 space-y-2">
             <label className="block text-xs font-bold text-slate-800">
               ✍️ รายละเอียดข้อความรายงาน *
@@ -318,7 +303,6 @@ export default function CreateReportPage() {
             />
           </div>
 
-          {/* แสดงพิกัด GPS */}
           <div className="px-2 flex items-center justify-between text-[10px] text-slate-500">
             <span>📍 พิกัด GPS ยืนยันตำแหน่ง:</span>
             <span className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200">
@@ -326,7 +310,6 @@ export default function CreateReportPage() {
             </span>
           </div>
 
-          {/* ปุ่มบันทึกรายงาน */}
           <button
             type="submit"
             disabled={loading}
@@ -334,11 +317,9 @@ export default function CreateReportPage() {
           >
             {loading ? "กำลังประมวลผลรูปภาพ / ส่งรายงาน..." : "🚀 ส่งรายงานการตรวจตรา"}
           </button>
-
         </form>
       </main>
 
-      {/* Modal สรุปผลส่งรายงานสำเร็จ */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-3xl p-6 max-w-xs w-full text-center space-y-4 shadow-2xl border border-slate-100">

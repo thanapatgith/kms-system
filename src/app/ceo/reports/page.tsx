@@ -65,6 +65,9 @@ export default function CEOReportsPage() {
   const [patrolCount, setPatrolCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
+  // ควบคุมการเปิด-ปิด (ซ่อน/แสดง) ตัวกรอง
+  const [showFilter, setShowFilter] = useState(false);
+
   // Modal สำหรับซูมดูรูปภาพแบบสไลด์ซ้าย-ขวา
   const [activeImages, setActiveImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
@@ -81,8 +84,8 @@ export default function CEOReportsPage() {
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
   const [selectedSite, setSelectedSite] = useState<string>("ALL");
-  const [selectedStatus, setSelectedStatus] = useState<string>("ALL"); // ALL, PENDING, ACKNOWLEDGED
-  const [searchEmployee, setSearchEmployee] = useState<string>(""); // ค้นหาชื่อหรือรหัสพนักงาน
+  const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
+  const [searchEmployee, setSearchEmployee] = useState<string>("");
 
   useEffect(() => {
     async function fetchReports() {
@@ -103,7 +106,6 @@ export default function CEOReportsPage() {
     fetchReports();
   }, [selectedMonth]);
 
-  // ฟังชั่นก์กดเลื่อนรูปภาพซ้าย-ขวาด้วยคีย์บอร์ด
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (activeImages.length === 0) return;
@@ -119,7 +121,6 @@ export default function CEOReportsPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeImages]);
 
-  // ดึงรายชื่อ Site งานทั้งหมดมารวมเป็น Dropdown
   const uniqueSites = useMemo(() => {
     const sitesSet = new Set<string>();
     incidents.forEach((item) => {
@@ -152,7 +153,6 @@ export default function CEOReportsPage() {
     }
   };
 
-  // กรองข้อมูลตามเงื่อนไขทั้งหมด
   const filteredIncidents = incidents.filter((item) => {
     const dateStr = item.created_at || item.createdAt;
     if (dateStr && (fromDate || toDate)) {
@@ -200,6 +200,8 @@ export default function CEOReportsPage() {
       console.error("Acknowledge error:", err);
     }
   };
+
+  const hasActiveFilter = fromDate || toDate || selectedSite !== "ALL" || selectedStatus !== "ALL" || searchEmployee.trim() !== "";
 
   return (
     <div className="w-full min-h-screen bg-slate-100 pb-24 font-sans">
@@ -254,108 +256,130 @@ export default function CEOReportsPage() {
           </div>
         </div>
 
-        {/* ชุดตัวกรองข้อมูล (Filter Section) */}
-        <div className="bg-white rounded-2xl shadow-sm p-3.5 border border-slate-200 space-y-3 text-xs">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-            <span className="font-bold text-slate-800">🔍 ตัวกรองข้อมูลรายงาน</span>
-            <button
-              type="button"
-              onClick={() => { setQuickDate("ALL"); setSelectedSite("ALL"); setSelectedStatus("ALL"); setSearchEmployee(""); }}
-              className="text-[10px] text-indigo-600 hover:underline font-bold cursor-pointer"
-            >
-              ล้างตัวกรอง
-            </button>
-          </div>
-
-          <div>
-            <label className="block text-[10px] text-slate-400 font-bold mb-1">ค้นหาชื่อ / รหัสพนักงาน:</label>
-            <input
-              type="text"
-              placeholder="พิมพ์ชื่อ หรือ รหัสพนักงาน (เช่น kms048)"
-              value={searchEmployee}
-              onChange={(e) => setSearchEmployee(e.target.value)}
-              className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 text-xs"
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-slate-500 font-semibold">ช่วงเวลา:</span>
-            <div className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => setQuickDate("TODAY")}
-                className="px-2.5 py-1 bg-slate-100 hover:bg-indigo-100 hover:text-indigo-800 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 transition cursor-pointer"
-              >
-                วันนี้
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickDate("LAST_7_DAYS")}
-                className="px-2.5 py-1 bg-slate-100 hover:bg-indigo-100 hover:text-indigo-800 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 transition cursor-pointer"
-              >
-                7 วันล่าสุด
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickDate("ALL")}
-                className="px-2.5 py-1 bg-slate-100 hover:bg-indigo-100 hover:text-indigo-800 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 transition cursor-pointer"
-              >
-                ทั้งหมด
-              </button>
+        {/* ปุ่มกดซ่อน/แสดง ตัวกรองข้อมูล */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden text-xs">
+          <div 
+            onClick={() => setShowFilter(!showFilter)}
+            className="p-3.5 bg-slate-50 hover:bg-slate-100 transition flex justify-between items-center cursor-pointer select-none"
+          >
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-800">🔍 ตัวกรองข้อมูลรายงาน</span>
+              {hasActiveFilter && !showFilter && (
+                <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 font-bold text-[9px] rounded-full">
+                  กำลังใช้งานตัวกรองอยู่
+                </span>
+              )}
             </div>
+            <span className="text-slate-500 font-bold text-sm">
+              {showFilter ? "▲ ซ่อน" : "▼ แสดง"}
+            </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[10px] text-slate-400 font-bold mb-1">ตั้งแต่วันที่:</label>
-              <input
-                type="date"
-                value={fromDate}
-                onClick={(e) => e.currentTarget.showPicker?.()}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 cursor-pointer text-xs"
-              />
+          {/* แผงตัวกรอง (จะซ่อนหรือแสดงตาม state showFilter) */}
+          {showFilter && (
+            <div className="p-3.5 border-t border-slate-100 space-y-3 animate-fadeIn">
+              <div className="flex justify-between items-center pb-1">
+                <span className="text-[10px] text-slate-400 font-semibold">ปรับแต่งเงื่อนไขการค้นหา</span>
+                <button
+                  type="button"
+                  onClick={() => { setQuickDate("ALL"); setSelectedSite("ALL"); setSelectedStatus("ALL"); setSearchEmployee(""); }}
+                  className="text-[10px] text-indigo-600 hover:underline font-bold cursor-pointer"
+                >
+                  ล้างตัวกรองทั้งหมด
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 font-bold mb-1">ค้นหาชื่อ / รหัสพนักงาน:</label>
+                <input
+                  type="text"
+                  placeholder="พิมพ์ชื่อ หรือ รหัสพนักงาน (เช่น kms048)"
+                  value={searchEmployee}
+                  onChange={(e) => setSearchEmployee(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 text-xs"
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-500 font-semibold">ช่วงเวลา:</span>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setQuickDate("TODAY")}
+                    className="px-2.5 py-1 bg-slate-100 hover:bg-indigo-100 hover:text-indigo-800 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 transition cursor-pointer"
+                  >
+                    วันนี้
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickDate("LAST_7_DAYS")}
+                    className="px-2.5 py-1 bg-slate-100 hover:bg-indigo-100 hover:text-indigo-800 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 transition cursor-pointer"
+                  >
+                    7 วันล่าสุด
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickDate("ALL")}
+                    className="px-2.5 py-1 bg-slate-100 hover:bg-indigo-100 hover:text-indigo-800 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 transition cursor-pointer"
+                  >
+                    ทั้งหมด
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-bold mb-1">ตั้งแต่วันที่:</label>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onClick={(e) => e.currentTarget.showPicker?.()}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 cursor-pointer text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-bold mb-1">ถึงวันที่:</label>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onClick={(e) => e.currentTarget.showPicker?.()}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 cursor-pointer text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 font-bold mb-1">ไซต์งาน (Site):</label>
+                <select
+                  value={selectedSite}
+                  onChange={(e) => setSelectedSite(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 cursor-pointer text-xs"
+                >
+                  <option value="ALL">🏢 ไซต์งานทั้งหมด ({uniqueSites.length} ไซต์)</option>
+                  {uniqueSites.map((site, idx) => (
+                    <option key={idx} value={site}>
+                      {site}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 font-bold mb-1">สถานะการรับทราบ:</label>
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 cursor-pointer text-xs"
+                >
+                  <option value="ALL">📌 ทั้งหมด</option>
+                  <option value="PENDING">⏳ ยังไม่ได้รับทราบ</option>
+                  <option value="ACKNOWLEDGED">✓ รับทราบแล้ว</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-[10px] text-slate-400 font-bold mb-1">ถึงวันที่:</label>
-              <input
-                type="date"
-                value={toDate}
-                onClick={(e) => e.currentTarget.showPicker?.()}
-                onChange={(e) => setToDate(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 cursor-pointer text-xs"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[10px] text-slate-400 font-bold mb-1">ไซต์งาน (Site):</label>
-            <select
-              value={selectedSite}
-              onChange={(e) => setSelectedSite(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 cursor-pointer text-xs"
-            >
-              <option value="ALL">🏢 ไซต์งานทั้งหมด ({uniqueSites.length} ไซต์)</option>
-              {uniqueSites.map((site, idx) => (
-                <option key={idx} value={site}>
-                  {site}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[10px] text-slate-400 font-bold mb-1">สถานะการรับทราบ:</label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 cursor-pointer text-xs"
-            >
-              <option value="ALL">📌 ทั้งหมด</option>
-              <option value="PENDING">⏳ ยังไม่ได้รับทราบ</option>
-              <option value="ACKNOWLEDGED">✓ รับทราบแล้ว</option>
-            </select>
-          </div>
+          )}
         </div>
 
         {/* รายการเหตุการณ์และการรายงานล่าสุด */}
@@ -488,8 +512,6 @@ export default function CEOReportsPage() {
           className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn"
         >
           <div className="relative max-w-xl w-full max-h-[90vh] flex flex-col items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            
-            {/* ปุ่มปิด (X) */}
             <button
               onClick={() => setActiveImages([])}
               className="absolute -top-12 right-0 text-white bg-slate-800 hover:bg-slate-700 w-9 h-9 rounded-full font-bold flex items-center justify-center transition cursor-pointer shadow-lg text-sm z-50"
@@ -497,15 +519,11 @@ export default function CEOReportsPage() {
               ✕
             </button>
 
-            {/* ตัวบอกลำดับรูปภาพ เช่น 1 / 3 */}
             <div className="absolute -top-12 left-0 text-white bg-slate-800/80 px-3 py-1.5 rounded-full text-xs font-bold font-mono">
               รูปที่ {currentImageIndex + 1} จาก {activeImages.length}
             </div>
 
-            {/* พื้นที่รูปภาพ */}
             <div className="relative w-full flex items-center justify-center">
-              
-              {/* ปุ่มเลื่อนซ้าย */}
               {activeImages.length > 1 && (
                 <button
                   onClick={() => setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : activeImages.length - 1))}
@@ -521,7 +539,6 @@ export default function CEOReportsPage() {
                 className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-2xl border border-slate-700 bg-black"
               />
 
-              {/* ปุ่มเลื่อนขวา */}
               {activeImages.length > 1 && (
                 <button
                   onClick={() => setCurrentImageIndex((prev) => (prev < activeImages.length - 1 ? prev + 1 : 0))}
@@ -530,13 +547,11 @@ export default function CEOReportsPage() {
                   ›
                 </button>
               )}
-
             </div>
 
             <p className="text-slate-300 text-[11px] mt-4 bg-slate-900/90 px-4 py-1.5 rounded-full border border-slate-700 shadow-md">
               คลิกปุ่มลูกศรซ้าย/ขวาบนภาพ หรือกดปุ่มคีย์บอร์ด ⬅ ➡ เพื่อเปลี่ยนรูป
             </p>
-
           </div>
         </div>
       )}

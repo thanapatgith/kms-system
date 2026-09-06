@@ -46,8 +46,8 @@ export default function ClientDashboardPage() {
     );
   }
 
-  const totalSites = clientData?.sitesCount || 1;
-  const totalGuards = clientData?.guardsCount || 4;
+  const totalSites = clientData?.sitesCount ?? 1;
+  const totalGuards = clientData?.guardsCount ?? 0;
 
   return (
     <div className="min-h-screen bg-slate-100 pb-24 font-sans text-slate-800">

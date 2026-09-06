@@ -346,7 +346,7 @@ export default function RandomCheckPage() {
             <div className="bg-[#fffdf0] border border-[#fcefc7] rounded-xl p-3 text-[11px] text-amber-900 leading-relaxed flex gap-2">
               <span className="text-sm">💡</span>
               <div>
-                <strong className="font-bold">คำชี้แจง:</strong> กรุณาถ่ายรูปเจ้าหน้าที่หรือเพื่อนร่วมงานที่มารับช่วงต่อในกะถัดไป เพื่อยืนยันการส่งมอบงาน
+                <strong className="font-bold">คำชี้แจง:</strong> กรุณาถ่ายรูปเจ้าหน้าที่หรือเพื่อนร่วมงานที่ประจำการอยู่ที่หน่วย เพื่อยืนยันการรายงาน
               </div>
             </div>
 
@@ -359,8 +359,8 @@ export default function RandomCheckPage() {
                   <span className="text-2xl">📷</span>
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-900">กดเพื่อเปิดกล้องถ่ายภาพผู้มารับช่วงต่อ</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">แตะเพื่อเริ่มใช้งานกล้อง (แนวตั้ง 3:4)</p>
+                  <p className="text-xs font-bold text-slate-900">กดเพื่อเปิดกล้องถ่ายภาพผู้ปฎิบัติหน้าที่ประจำหน่วยงาน</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">แตะเพื่อเริ่มใช้งานกล้อง</p>
                 </div>
               </div>
             ) : (

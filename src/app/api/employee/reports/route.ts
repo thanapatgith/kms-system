@@ -6,7 +6,7 @@ import { uploadReportImage } from "@/lib/supabaseStorage";
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// 1. ดึงประวัติการแจ้งเหตุการณ์ / รายงานการตรวจตรา (GET)
+// 1. ดึงประวัติการแจ้งเหตุการณ์ และเฉพาะหน่วยงานของพนักงานคนนี้ (GET)
 export async function GET(req: Request) {
   try {
     const session = await getSession();
@@ -14,10 +14,50 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: "ไม่ได้เข้าสู่ระบบ" }, { status: 401 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const action = searchParams.get("action");
+
+    // ถ้า Request ขอรายชื่อหน่วยงาน ให้ดึงเฉพาะ site ของพนักงานคนนี้เท่านั้น
+    if (action === "sites") {
+      const userList = (await prisma.$queryRaw`
+        SELECT site_id FROM users WHERE id = ${session.userId} LIMIT 1
+      `.catch(() => [])) as any[];
+
+      const userSiteId = userList[0]?.site_id;
+
+      let branchesList: string[] = [];
+      let currentSiteName = "หน่วยงานทั่วไป";
+
+      if (userSiteId) {
+        const sites = (await prisma.$queryRaw`
+          SELECT id, site_name FROM sites WHERE id = ${userSiteId} LIMIT 1
+        `.catch(() => [])) as any[];
+
+        if (sites.length > 0) {
+          currentSiteName = sites[0].site_name;
+          branchesList = [currentSiteName];
+        }
+      }
+
+      // ถ้าพนักงานคนนี้ยังไม่ได้ผูก site_id ให้ใช้ค่าเริ่มต้น
+      if (branchesList.length === 0) {
+        branchesList = ["หน่วยงานทั่วไป"];
+      }
+
+      return NextResponse.json({
+        ok: true,
+        branches: branchesList,
+        defaultBranch: currentSiteName,
+      });
+    }
+
+    // กรณีปกติ: ดึงประวัติรายงาน
     const reports = (await prisma.$queryRaw`
-      SELECT * FROM incident_reports 
-      WHERE user_id = ${session.userId} 
-      ORDER BY created_at DESC
+      SELECT r.*, s.site_name 
+      FROM incident_reports r
+      LEFT JOIN sites s ON r.site_id = s.id
+      WHERE r.user_id = ${session.userId} 
+      ORDER BY r.created_at DESC
     `.catch(() => [])) as any[];
 
     const formatted = reports.map((item: any) => {
@@ -41,6 +81,8 @@ export async function GET(req: Request) {
         longitude: item.longitude,
         location: item.latitude && item.longitude ? `${Number(item.latitude).toFixed(4)}, ${Number(item.longitude).toFixed(4)}` : "-",
         images: item.images || [],
+        siteId: item.site_id,
+        siteName: item.site_name || "หน่วยงานทั่วไป",
       };
     });
 
@@ -74,7 +116,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "กรุณากรอกข้อความรายงานเหตุการณ์/การตรวจตรา" }, { status: 400 });
     }
 
-    // ค้นหา siteId จากชื่อหน่วยงาน (branchName)
     let targetSiteId: string | null = null;
     if (branchName && branchName !== "หน่วยงานทั่วไป") {
       const sites = (await prisma.$queryRaw`
@@ -85,7 +126,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // จัดการอัปโหลดไฟล์รูปภาพขึ้น Supabase Storage
     const imageUrls: string[] = [];
     if (imageFiles && imageFiles.length > 0) {
       for (const file of imageFiles) {
@@ -99,7 +139,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // บันทึกลงฐานข้อมูลด้วย Raw SQL เพื่อหลีกเลี่ยงปัญหา Field Mismatch (siteId vs site_id)
     await prisma.$queryRaw`
       INSERT INTO incident_reports (id, user_id, site_id, message, latitude, longitude, images, status, created_at, updated_at)
       VALUES (
