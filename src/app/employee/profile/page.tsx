@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import SalarySummaryCard from "@/components/SalarySummaryCard";
 
 export default function EmployeeProfilePage() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export default function EmployeeProfilePage() {
     totalBorrowedThisMonth: 0,
     remainingCredit: 10000,
   });
-  const [leavesCount, setLeavesCount] = useState(0);
+  const [leavesCount, setLeavesCount] = useState(0); // จำนวนวันที่ใช้ไปแล้ว
 
   const [showNotiModal, setShowNotiModal] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -45,7 +46,6 @@ export default function EmployeeProfilePage() {
     }
   };
 
-  // ดึงข้อมูลการแจ้งเตือนจาก API ที่สร้างขึ้น
   const fetchNotifications = async () => {
     try {
       const res = await fetch("/api/employee/notifications");
@@ -58,7 +58,6 @@ export default function EmployeeProfilePage() {
     }
   };
 
-  // ฟังก์ชันอัปเดตสถานะเมื่อกดอ่านแจ้งเตือนแล้ว
   const markAsRead = async (id: string) => {
     try {
       await fetch("/api/employee/notifications", {
@@ -73,14 +72,16 @@ export default function EmployeeProfilePage() {
   };
 
   const dailyWage = Math.round(profile?.dailyRate || 520);
-  const workedDays = profile?.workedDays || 20;
+  const workedDays = profile?.workedDays || 0;
   const grossEarnings = Math.round(profile?.grossIncome || (workedDays * dailyWage));
   const totalDeduction = Math.round(profile?.totalDeductions || 0);
-  
   const netSalaryPayable = Math.round((profile?.netSalary || grossEarnings) - totalDeduction);
   
-  // นับจำนวนที่ยังไม่ได้อ่าน (is_read เป็น false)
   const unreadCount = notifications.filter((n) => !n.is_read).length;
+
+  // คำนวณสิทธิ์วันลา (โควตา 3 วันต่อปี)
+  const totalLeaveQuota = 3;
+  const remainingLeaveDays = Math.max(0, totalLeaveQuota - leavesCount);
 
   return (
     <div className="w-full min-h-screen bg-slate-100 pb-32 text-base font-sans">
@@ -121,60 +122,30 @@ export default function EmployeeProfilePage() {
       {/* Main Content */}
       <main className="max-w-md mx-auto px-4 mt-5 space-y-4">
         
-        {/* การ์ดต้อนรับ & ประมาณการเงิน */}
-        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-5 shadow-xl space-y-4 border border-slate-700">
-          <div className="flex justify-between items-start gap-2">
-            <div className="space-y-1 overflow-hidden">
-              <p className="text-sm text-slate-300 font-medium truncate">
-                ยินดีต้อนรับ, <strong className="text-white text-base">{profile?.name || "พนักงาน"}</strong>
-              </p>
-              <p className="text-xs text-orange-400 font-bold truncate">
-                📍 {profile?.branch || "หน่วยงานสังกัด KMS"}
-              </p>
-            </div>
-            <span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-xs font-bold shrink-0">
-              วันเงินออก 10 ถัดไป
-            </span>
-          </div>
-
-          <div className="bg-slate-800/95 p-5 rounded-2xl border border-slate-700/80 space-y-4 shadow-inner">
-            <div className="flex justify-between items-end px-1">
-              <span className="text-xs text-slate-300 font-bold pb-1">
-                💰 สุทธิคาดว่าจะได้รับเข้าบัญชี:
-              </span>
-              <span className="text-3xl font-black font-mono text-emerald-400 tracking-tight">
-                ฿{netSalaryPayable < 0 ? 0 : netSalaryPayable.toLocaleString()}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3 pt-3 border-t border-slate-700/80 text-center font-mono">
-              <div className="bg-slate-900/90 py-3 px-2 rounded-2xl border border-slate-800 shadow-sm">
-                <span className="block text-xs font-sans text-slate-400 font-medium mb-1">ทำแล้ว</span>
-                <span className="font-extrabold text-slate-100 text-base">{workedDays} วัน</span>
-              </div>
-              <div className="bg-slate-900/90 py-3 px-2 rounded-2xl border border-slate-800 shadow-sm">
-                <span className="block text-xs font-sans text-slate-400 font-medium mb-1">ค่าจ้างสะสม</span>
-                <span className="font-extrabold text-slate-100 text-sm">฿{grossEarnings.toLocaleString()}</span>
-              </div>
-              <div className="bg-slate-900/90 py-3 px-2 rounded-2xl border border-slate-800 shadow-sm">
-                <span className="block text-xs font-sans text-slate-400 font-medium mb-1">ยอดรวมหัก</span>
-                <span className="font-extrabold text-red-400 text-sm">-฿{totalDeduction.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* ใช้ Component ร่วมกันสำหรับการ์ดสรุปยอดเงินและวันทำงาน */}
+        <SalarySummaryCard
+          name={profile?.name}
+          branch={profile?.branch}
+          workedDays={workedDays}
+          grossEarnings={grossEarnings}
+          totalDeductions={totalDeduction}
+          netSalary={netSalaryPayable}
+          roleLabel="KMS"
+          roleBadgeBg="bg-orange-500"
+          roleBadgeText="text-white"
+        />
 
         {/* สรุปสิทธิ์ 2 ช่อง */}
         <div className="grid grid-cols-2 gap-3.5">
           <Link href="/employee/leaves" className="bg-white rounded-2xl p-4 border-2 border-slate-200 shadow-sm space-y-2 hover:border-orange-500 transition">
             <div className="flex justify-between items-center text-xs">
-              <span className="font-extrabold text-slate-800 text-sm">📝 วันลาสะสม</span>
-              <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${leavesCount >= 3 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-800"}`}>
-                {leavesCount >= 3 ? "เกิน 3 วัน" : "ปกติ"}
+              <span className="font-extrabold text-slate-800 text-sm">📝 สิทธิ์วันลา</span>
+              <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${remainingLeaveDays === 0 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-800"}`}>
+                {remainingLeaveDays === 0 ? "สิทธิ์หมด" : "ปกติ"}
               </span>
             </div>
-            <p className="text-2xl font-black text-slate-900 font-mono">
-              {leavesCount} <span className="text-sm text-slate-600 font-bold">วัน</span>
+            <p className="text-2xl font-black text-slate-900 font-mono flex items-baseline gap-1">
+              {remainingLeaveDays} <span className="text-sm text-slate-500 font-normal">/ 3 วัน</span>
             </p>
           </Link>
 
@@ -281,7 +252,7 @@ export default function EmployeeProfilePage() {
 
       </main>
 
-      {/* Modal Notification (เชื่อมต่อข้อมูลจริง) */}
+      {/* Modal Notification */}
       {showNotiModal && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200 max-h-[80vh] flex flex-col">

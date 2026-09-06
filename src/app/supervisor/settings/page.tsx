@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import WageBreakdownCard from "@/components/WageBreakdownCard";
 
-export default function EmployeeSettingsPage() {
+export default function SupervisorSettingsPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -129,10 +129,10 @@ export default function EmployeeSettingsPage() {
       <header className="bg-slate-900 text-white shadow-md sticky top-0 z-50 border-b border-slate-800">
         <div className="max-w-md mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2.5">
-            <Link href="/employee/profile" className="text-slate-400 hover:text-white text-xs font-bold">
-              ← กลับหน้าแรก
+            <Link href="/supervisor/dashboard" className="text-slate-400 hover:text-white text-xs font-bold">
+              ← กลับแดชบอร์ด
             </Link>
-            <h1 className="text-sm font-bold">โปรไฟล์พนักงาน</h1>
+            <h1 className="text-sm font-bold">โปรไฟล์ผู้ควบคุมงาน</h1>
           </div>
           <button
             onClick={handleLogout}
@@ -160,7 +160,7 @@ export default function EmployeeSettingsPage() {
 
         {/* ส่วนรูปโปรไฟล์และชื่อ */}
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm text-center space-y-3">
-          <div className="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-orange-500 shadow-md bg-slate-100 flex items-center justify-center">
+          <div className="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-amber-500 shadow-md bg-slate-100 flex items-center justify-center">
             {imagePreview ? (
               <img src={imagePreview} alt="Profile" className="w-full h-full object-cover" />
             ) : (
@@ -169,7 +169,7 @@ export default function EmployeeSettingsPage() {
           </div>
 
           <div>
-            <h2 className="text-lg font-extrabold text-slate-900">{profile?.name || "พนักงาน KMS"}</h2>
+            <h2 className="text-lg font-extrabold text-slate-900">{profile?.name || "ผู้ควบคุมงาน"}</h2>
             <p className="text-xs text-slate-500 font-medium">รหัสพนักงาน: <span className="font-mono font-bold text-slate-800">{profile?.employeeCode || "-"}</span></p>
           </div>
 
@@ -177,7 +177,7 @@ export default function EmployeeSettingsPage() {
             <button
               type="button"
               onClick={() => setIsEditing(true)}
-              className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl transition shadow cursor-pointer"
+              className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition shadow cursor-pointer"
             >
               ✏️ แก้ไขข้อมูล / เปลี่ยนรหัสผ่าน
             </button>
@@ -200,10 +200,10 @@ export default function EmployeeSettingsPage() {
               </div>
               <div className="flex justify-between text-slate-600 py-1">
                 <span>หน่วยงานสังกัด:</span>
-                <span className="font-bold text-orange-600">{profile?.branch || "-"}</span>
+                <span className="font-bold text-amber-600">{profile?.branch || "-"}</span>
               </div>
               
-              {/* เรียกใช้ Component กลางที่นี่ */}
+              {/* เรียกใช้ Component กลางสำหรับแสดงรายละเอียดค่าจ้าง */}
               <WageBreakdownCard
                 baseWage8Hrs={profile?.baseWage8Hrs}
                 otRate4Hrs={profile?.otRate}
@@ -212,17 +212,11 @@ export default function EmployeeSettingsPage() {
             </div>
 
             <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3 text-xs">
-              <h3 className="font-bold text-slate-800 border-b pb-2">🛡️ ข้อมูลใบอนุญาต รปภ. (ทป.7)</h3>
+              <h3 className="font-bold text-slate-800 border-b pb-2">🛡️ ข้อมูลใบอนุญาต (ธภ.7)</h3>
               
               <div className="flex justify-between text-slate-600 py-1">
-                <span>เลขที่ใบอนุญาต ทป.7:</span>
-                <span className="font-mono font-bold text-slate-900">{profile?.thop7LicenseNo || profile?.thop7_license_no || "ยังไม่ได้บันทึก"}</span>
-              </div>
-              <div className="flex justify-between text-slate-600 py-1">
-                <span>วันหมดอายุ ทป.7:</span>
-                <span className="font-mono font-bold text-red-600">
-                  {profile?.thop7Expire ? new Date(profile.thop7Expire).toLocaleDateString("th-TH") : "ไม่ระบุ"}
-                </span>
+                <span>เลขที่ใบอนุญาต:</span>
+                <span className="font-mono font-bold text-slate-900">{profile?.thop7LicenseNo || "ไม่มีข้อมูล"}</span>
               </div>
             </div>
 
@@ -261,7 +255,7 @@ export default function EmployeeSettingsPage() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2 bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold rounded-xl transition border border-orange-200 cursor-pointer"
+                className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold rounded-xl transition border border-amber-200 cursor-pointer"
               >
                 📷 เปลี่ยนรูปภาพโปรไฟล์ใหม่
               </button>
@@ -279,7 +273,7 @@ export default function EmployeeSettingsPage() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="กรอกเบอร์โทรศัพท์ 10 หลัก"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-amber-500"
                 />
               </div>
               <div>
@@ -289,7 +283,7 @@ export default function EmployeeSettingsPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="example@email.com"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-amber-500"
                 />
               </div>
               <div>
@@ -299,7 +293,7 @@ export default function EmployeeSettingsPage() {
                   value={lineId}
                   onChange={(e) => setLineId(e.target.value)}
                   placeholder="ไอดีไลน์สำหรับติดต่อ"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-amber-500"
                 />
               </div>
               <div>
@@ -309,7 +303,7 @@ export default function EmployeeSettingsPage() {
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="ระบุที่อยู่ปัจจุบันของคุณ..."
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-orange-500 resize-none"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-amber-500 resize-none"
                 />
               </div>
             </div>
@@ -323,7 +317,7 @@ export default function EmployeeSettingsPage() {
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
                   placeholder="กรอกรหัสผ่านเดิมเพื่อยืนยันตัวตน"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 
@@ -334,7 +328,7 @@ export default function EmployeeSettingsPage() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="กรอกรหัสผ่านใหม่ (ถ้าต้องการเปลี่ยน)"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 
@@ -345,7 +339,7 @@ export default function EmployeeSettingsPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="กรอกรหัสผ่านใหม่อีกครั้งเพื่อยืนยัน"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-amber-500"
                 />
               </div>
             </div>
@@ -361,7 +355,7 @@ export default function EmployeeSettingsPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-1/2 py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-2xl shadow-lg shadow-orange-500/20 transition disabled:opacity-50 cursor-pointer"
+                className="w-1/2 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-2xl shadow-lg shadow-amber-500/20 transition disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? "กำลังบันทึก..." : "💾 บันทึกข้อมูล"}
               </button>
@@ -370,26 +364,6 @@ export default function EmployeeSettingsPage() {
         )}
 
       </main>
-
-      {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-slate-950 border-t-2 border-slate-800 px-3 py-3 flex justify-around items-center z-50 shadow-2xl">
-        <Link href="/employee/profile" className="flex flex-col items-center text-slate-200 hover:text-orange-400 text-xs font-extrabold transition">
-          <span className="text-2xl mb-1">👤</span>
-          หน้าแรก
-        </Link>
-        <Link href="/employee/attendance" className="flex flex-col items-center text-slate-200 hover:text-orange-400 text-xs font-extrabold transition">
-          <span className="text-2xl mb-1">⏱️</span>
-          ลงเวลาทำงาน
-        </Link>
-        <Link href="/employee/reports" className="flex flex-col items-center text-slate-200 hover:text-orange-400 text-xs font-extrabold transition">
-          <span className="text-2xl mb-1">🛡️</span>
-          รายงาน
-        </Link>
-        <Link href="/employee/payrolls" className="flex flex-col items-center text-slate-200 hover:text-orange-400 text-xs font-extrabold transition">
-          <span className="text-2xl mb-1">💵</span>
-          เงินเดือน
-        </Link>
-      </nav>
     </div>
   );
 }

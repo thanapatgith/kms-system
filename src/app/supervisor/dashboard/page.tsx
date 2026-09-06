@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { calculateLoanDetails } from "@/utils/loanCalculator";
+import SalarySummaryCard from "@/components/SalarySummaryCard";
 
 export default function SupervisorDashboardPage() {
   const router = useRouter();
@@ -20,7 +21,6 @@ export default function SupervisorDashboardPage() {
   const [leavesCount] = useState(4);
 
   const [showNotiModal, setShowNotiModal] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const [notifications] = useState([
     { id: "noti-1", title: "มีคำขออนุมัติใบลารอการพิจารณา", message: "พนักงานในสังกัดได้ยื่นคำขอลาใหม่ กรุณาตรวจสอบ", time: "10 นาทีที่แล้ว" },
@@ -71,13 +71,12 @@ export default function SupervisorDashboardPage() {
     return stats.workedDays > 0 ? stats.workedDays : Math.max(0, Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
   };
 
-  const dailyWage = profile?.dailyRate || 520;
+  const dailyWage = profile?.dailyRate || 1613;
   const workedDays = stats.workedDays > 0 ? stats.workedDays : calculateCycleWorkDays();
   const grossEarnings = Math.round(stats.grossEarnings || (workedDays * dailyWage));
   const totalDeduction = Math.round(stats.totalDeductions ?? 0);
   const netSalaryPayable = Math.round(stats.netSalary || (grossEarnings - totalDeduction));
 
-  // ใช้ฟังก์ชันกลางคำนวณสิทธิ์กู้ยืมสูงสุดให้ตรงกับหน้ากู้ยืม 100% แบบนิ่งสนิท
   const loanCalc = calculateLoanDetails({
     baseDailyRate: dailyWage,
     workedDaysThisCycle: workedDays,
@@ -88,7 +87,6 @@ export default function SupervisorDashboardPage() {
 
   const totalBorrowedThisMonth = stats.totalBorrowedThisMonth || 0;
   const remainingCredit = Math.max(0, loanCalc.maxQuota - totalBorrowedThisMonth);
-
   const unreadCount = notifications.length;
 
   return (
@@ -104,8 +102,9 @@ export default function SupervisorDashboardPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* กดแล้วพาไปหน้า /supervisor/settings ทันที */}
             <button
-              onClick={() => setShowProfileModal(true)}
+              onClick={() => router.push("/supervisor/settings")}
               className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-sm"
             >
               <span>👤</span>
@@ -130,50 +129,18 @@ export default function SupervisorDashboardPage() {
       {/* Main Content */}
       <main className="max-w-md mx-auto px-4 mt-4 space-y-4">
         
-        {/* การ์ดแสดงยอดเงิน */}
-        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-4 shadow-xl space-y-3 relative overflow-hidden border border-slate-800">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[11px] text-slate-400 font-medium">
-                ยินดีต้อนรับ, <strong className="text-white">{profile?.name || stats.employeeName || "ผู้ควบคุมงาน"}</strong>
-              </p>
-              <p className="text-[10px] text-amber-400 font-semibold">
-                📍 {profile?.branch || profile?.site?.siteName || "หน่วยงานสังกัด KMS"}
-              </p>
-            </div>
-            <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-[10px] font-bold">
-              วันเงินออก 10 ถัดไป
-            </span>
-          </div>
-
-          <div className="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700/60 space-y-2">
-            <div className="flex justify-between items-baseline">
-              <span className="text-[11px] text-slate-300 font-medium">
-                💰 สุทธิคาดว่าจะได้รับเข้าบัญชี:
-              </span>
-              <span className="text-2xl font-black font-mono text-emerald-400">
-                ฿{netSalaryPayable < 0 ? 0 : netSalaryPayable.toLocaleString()}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-700/60 text-center font-mono text-[10px]">
-              <div className="bg-slate-900/50 p-1.5 rounded-xl">
-                <span className="block text-[9px] font-sans text-slate-400">ทำแล้ว (นับจาก 11)</span>
-                <span className="font-bold text-slate-200">{workedDays} วัน</span>
-              </div>
-              <div className="bg-slate-900/50 p-1.5 rounded-xl">
-                <span className="block text-[9px] font-sans text-slate-400">ค่าจ้างสะสม</span>
-                <span className="font-bold text-slate-200">฿{grossEarnings.toLocaleString()}</span>
-              </div>
-              <div className="bg-slate-900/50 p-1.5 rounded-xl">
-                <span className="block text-[9px] font-sans text-slate-400">รวมหัก (ภาษี/อื่นๆ)</span>
-                <span className="font-bold text-red-400">
-                  {totalDeduction > 0 ? `-฿${totalDeduction.toLocaleString()}` : "-"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* ใช้ Component ร่วมกันสำหรับการ์ดสรุปยอดเงิน */}
+        <SalarySummaryCard
+          name={profile?.name || stats.employeeName}
+          branch={profile?.branch || profile?.site?.siteName}
+          workedDays={workedDays}
+          grossEarnings={grossEarnings}
+          totalDeductions={totalDeduction}
+          netSalary={netSalaryPayable}
+          roleLabel="SUPERVISOR"
+          roleBadgeBg="bg-amber-500"
+          roleBadgeText="text-slate-950"
+        />
 
         {/* สรุปสิทธิ์ 2 ช่อง */}
         <div className="grid grid-cols-2 gap-2.5">
@@ -300,79 +267,6 @@ export default function SupervisorDashboardPage() {
         </div>
 
       </main>
-
-      {/* Modal ข้อมูลส่วนตัว */}
-      {showProfileModal && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-5 space-y-4 border border-slate-100 my-auto text-xs">
-            <div className="flex justify-between items-center border-b pb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">👤</span>
-                <h3 className="font-bold text-slate-900 text-sm">ข้อมูลส่วนตัวผู้ควบคุมงาน</h3>
-              </div>
-              <button
-                onClick={() => setShowProfileModal(false)}
-                className="text-slate-400 hover:text-slate-600 font-bold text-sm cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-2.5 text-slate-600">
-              <div className="flex justify-between pb-1 border-b border-slate-100">
-                <span>ชื่อ-นามสกุล:</span>
-                <span className="font-bold text-slate-900">{profile?.name || "-"}</span>
-              </div>
-              <div className="flex justify-between pb-1 border-b border-slate-100">
-                <span>รหัสพนักงาน:</span>
-                <span className="font-mono font-bold text-slate-900">{profile?.employeeCode || "-"}</span>
-              </div>
-              <div className="flex justify-between pb-1 border-b border-slate-100">
-                <span>เลขบัตรประชาชน:</span>
-                <span className="font-mono font-bold text-slate-900">{profile?.idCardNumber || "-"}</span>
-              </div>
-              <div className="flex justify-between pb-1 border-b border-slate-100">
-                <span>เบอร์โทรศัพท์:</span>
-                <span className="font-mono font-bold text-slate-900">{profile?.phone || "-"}</span>
-              </div>
-              <div className="flex justify-between pb-1 border-b border-slate-100">
-                <span>อัตราค่าจ้างรายวัน:</span>
-                <span className="font-mono font-bold text-emerald-700">฿{dailyWage}/วัน</span>
-              </div>
-              <div className="flex justify-between pb-1 border-b border-slate-100">
-                <span>ใบอนุญาต ปรก. (ธภ.7):</span>
-                <span className="font-bold text-slate-700">{profile?.thop7LicenseNo || "ไม่มีข้อมูล"}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span>การยินยอม PDPA:</span>
-                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-200 font-bold text-[10px]">
-                  ✓ ยินยอมแล้ว
-                </span>
-              </div>
-            </div>
-
-            <div className="pt-2 flex gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  await fetch("/api/auth/logout", { method: "POST" });
-                  router.push("/login");
-                }}
-                className="w-1/2 py-2.5 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 font-bold text-xs rounded-xl transition cursor-pointer"
-              >
-                🚪 ออกจากระบบ
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowProfileModal(false)}
-                className="w-1/2 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer"
-              >
-                ปิดหน้าต่าง
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal Notification */}
       {showNotiModal && (

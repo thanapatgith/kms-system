@@ -25,11 +25,21 @@ export async function GET(req: Request) {
     }
 
     let dailyRate = 520;
+    let baseWage8Hrs = 400; 
+    let otRate4Hrs = 120; // ค่า OT 4 ชั่วโมง (โอทีรายชั่วโมง * 4)
     let branchName = "หน่วยงานสังกัด KMS";
 
+    // คำนวณรอบวันทำงาน (นับจากวันที่ 11)
     const now = new Date();
-    const currentDay = now.getDate();
-    let workedDays = currentDay >= 11 ? (currentDay - 11 + 1) : 15;
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    let startDate = new Date(year, month, 11);
+    if (now.getDate() < 11) {
+      startDate = new Date(year, month - 1, 11);
+    }
+    startDate.setHours(0, 0, 0, 0);
+
+    let workedDays = Math.max(0, Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
     let grossIncome = 0;
     let netSalary = 0;
@@ -38,28 +48,31 @@ export async function GET(req: Request) {
     if (user.employee_code) {
       const { data: payrollData } = await supabase
         .from("payrolls")
-        .select("daily_wage, work_days, gross_income, net_salary, total_deductions, site_name")
+        .select("wage, overtime_pay, daily_wage, gross_income, net_salary, total_deductions, site_name")
         .eq("employee_code", user.employee_code.trim())
         .maybeSingle();
 
-      if (payrollData?.daily_wage) {
-        dailyRate = Number(payrollData.daily_wage);
-      }
+      if (payrollData) {
+        // ดึงค่า wage และ overtime_pay จาก database โดยตรงแบบไดนามิก
+        const dbWage = Number(payrollData.wage) || 400; // ค่าจ้างปกติ 8 ชม.
+        const dbOtPerHour = Number(payrollData.overtime_pay) || 30; // เรท OT ต่อชั่วโมง
 
-      grossIncome = dailyRate * workedDays;
-      totalDeductions = Number(payrollData?.total_deductions) || 0;
-      netSalary = grossIncome - totalDeductions;
+        baseWage8Hrs = dbWage;
+        otRate4Hrs = dbOtPerHour * 4; // นำเรท OT มาคูณ 4 ชั่วโมง (ทำงาน 12 ชม. รวม OT 4 ชม.)
+        dailyRate = baseWage8Hrs + otRate4Hrs; // รวมเป็นเรทรายวันต่อวัน (12 ชม.)
 
-      // ให้น้ำหนักสูงสุดกับ site_name ในตาราง payrolls
-      if (payrollData?.site_name) {
-        branchName = payrollData.site_name;
+        totalDeductions = Number(payrollData?.total_deductions) || 0;
+
+        if (payrollData?.site_name) {
+          branchName = payrollData.site_name;
+        }
       }
-    } else {
-      grossIncome = dailyRate * workedDays;
-      netSalary = grossIncome - totalDeductions;
     }
 
-    // ถ้าใน payrolls ไม่มีชื่อหน่วยงาน ให้ลองเช็กจากตาราง sites ผ่าน site_id สำรอง
+    // คำนวณรายได้สะสมจากอัตราค่าจ้างรายวันจริง × จำนวนวันที่ทำงาน
+    grossIncome = dailyRate * workedDays;
+    netSalary = grossIncome - totalDeductions;
+
     if (branchName === "หน่วยงานสังกัด KMS" && user.site_id) {
       const { data: siteData } = await supabase
         .from("sites")
@@ -71,9 +84,6 @@ export async function GET(req: Request) {
         branchName = siteData.site_name;
       }
     }
-
-    let baseWage8Hrs = dailyRate > 400 ? 400 : Math.round(dailyRate * 0.77);
-    let otRate = dailyRate - baseWage8Hrs;
 
     const userImage = user.avatar_url || user.image || null;
 
@@ -92,9 +102,9 @@ export async function GET(req: Request) {
         age: user.age || null,
         gender: user.gender || "-",
         branch: branchName,
-        dailyRate: dailyRate,
-        baseWage8Hrs: baseWage8Hrs,
-        otRate: otRate,
+        dailyRate: dailyRate,       // เรทรายวันรวม 12 ชม.
+        baseWage8Hrs: baseWage8Hrs, // ค่าจ้างปกติ 8 ชม.
+        otRate: otRate4Hrs,         // ค่า OT 4 ชม. (คำนวณจาก overtime_pay * 4)
         workedDays: workedDays,
         grossIncome: grossIncome,
         netSalary: netSalary,
@@ -132,7 +142,6 @@ export async function PUT(req: Request) {
       address: address || null,
     };
 
-    // ตรวจสอบและเปลี่ยนรหัสผ่าน
     if (oldPassword && typeof oldPassword === 'string' && oldPassword.trim() !== '' && newPassword) {
         const { data: currentUser, error: fetchError } = await supabase
             .from("users")
@@ -153,7 +162,6 @@ export async function PUT(req: Request) {
         updateData.password_hash = await bcrypt.hash(newPassword, salt);
     }
 
-    // อัปโหลดรูปภาพใหม่
     if (imageFile && typeof imageFile === "object" && typeof imageFile.size === "number" && imageFile.size > 0) {
       const bytes = await imageFile.arrayBuffer();
       const buffer = Buffer.from(bytes);
@@ -179,7 +187,6 @@ export async function PUT(req: Request) {
       }
     }
 
-    // บันทึกลง Database
     const { error: updateError } = await supabase
       .from("users")
       .update(updateData)
