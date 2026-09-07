@@ -64,9 +64,13 @@ export default function EmployeeAttendancePage() {
     try {
       const res = await fetch("/api/employee/attendance?action=sites", { cache: "no-store" });
       const data = await res.json();
-      if (data.ok && data.branches) {
-        setBranchesList(data.branches);
-        setSelectedBranch(data.defaultBranch || data.branches[0]);
+      
+      const siteList = data.sites || data.branches;
+
+      if (data.ok && siteList && siteList.length > 0) {
+        const branchNames = siteList.map((s: any) => (typeof s === "string" ? s : s.name));
+        setBranchesList(branchNames);
+        setSelectedBranch(data.defaultBranch || branchNames[0]);
       } else {
         setBranchesList(["หน่วยงานทั่วไป"]);
         setSelectedBranch("หน่วยงานทั่วไป");

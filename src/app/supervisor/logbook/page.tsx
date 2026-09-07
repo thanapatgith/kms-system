@@ -21,6 +21,7 @@ export default function SupervisorLogbookPage() {
 
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL"); // "ALL", "PENDING", "ACKNOWLEDGED"
 
   useEffect(() => {
     fetchSupervisorData();
@@ -105,6 +106,11 @@ export default function SupervisorLogbookPage() {
   };
 
   const filteredReports = reports.filter((item) => {
+    // กรองตามสถานะการกดรับทราบ
+    if (statusFilter === "PENDING" && item.status === "ACKNOWLEDGED") return false;
+    if (statusFilter === "ACKNOWLEDGED" && item.status !== "ACKNOWLEDGED") return false;
+
+    // กรองตามช่วงวันที่
     if (!item.createdAt) return true;
 
     const d = new Date(item.createdAt);
@@ -155,55 +161,99 @@ export default function SupervisorLogbookPage() {
           </div>
         )}
 
-        {/* ตัวกรองช่วงวันที่ */}
-        <div className="bg-white rounded-2xl shadow-sm p-3.5 border border-slate-200 space-y-2.5">
-          <div className="flex justify-between items-center">
-            <span className="text-xs font-bold text-slate-800">📅 ค้นหาตามช่วงวันที่</span>
+        {/* ตัวกรองสถานะ และ ช่วงวันที่ */}
+        <div className="bg-white rounded-2xl shadow-sm p-3.5 border border-slate-200 space-y-3">
+          
+          {/* ตัวกรองสถานะ */}
+          <div className="flex justify-between items-center border-b border-slate-100 pb-2.5">
+            <span className="text-xs font-bold text-slate-800">📌 สถานะการรับทราบ</span>
             <div className="flex gap-1">
               <button
                 type="button"
-                onClick={() => setQuickDate("TODAY")}
-                className="px-2 py-1 bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 transition cursor-pointer"
+                onClick={() => setStatusFilter("ALL")}
+                className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition cursor-pointer ${
+                  statusFilter === "ALL" 
+                    ? "bg-amber-600 text-white border-amber-600 shadow-sm" 
+                    : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-amber-100 hover:text-amber-800"
+                }`}
               >
-                วันนี้
+                ทั้งหมด
               </button>
               <button
                 type="button"
-                onClick={() => setQuickDate("LAST_7_DAYS")}
-                className="px-2 py-1 bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 transition cursor-pointer"
+                onClick={() => setStatusFilter("PENDING")}
+                className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition cursor-pointer ${
+                  statusFilter === "PENDING" 
+                    ? "bg-amber-600 text-white border-amber-600 shadow-sm" 
+                    : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-amber-100 hover:text-amber-800"
+                }`}
               >
-                7 วันล่าสุด
+                รอตรวจสอบ
               </button>
               <button
                 type="button"
-                onClick={() => setQuickDate("ALL")}
-                className="px-2 py-1 bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 transition cursor-pointer"
+                onClick={() => setStatusFilter("ACKNOWLEDGED")}
+                className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition cursor-pointer ${
+                  statusFilter === "ACKNOWLEDGED" 
+                    ? "bg-amber-600 text-white border-amber-600 shadow-sm" 
+                    : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-amber-100 hover:text-amber-800"
+                }`}
               >
-                ดูทั้งหมด
+                รับทราบแล้ว
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <label className="block text-[10px] text-slate-500 font-bold mb-1">ตั้งแต่วันที่:</label>
-              <input
-                type="date"
-                value={fromDate}
-                onClick={(e) => e.currentTarget.showPicker?.()}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-amber-500 cursor-pointer"
-              />
+          {/* ตัวกรองช่วงวันที่ */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-slate-800">📅 ค้นหาตามช่วงวันที่</span>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setQuickDate("TODAY")}
+                  className="px-2 py-1 bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 transition cursor-pointer"
+                >
+                  วันนี้
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQuickDate("LAST_7_DAYS")}
+                  className="px-2 py-1 bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 transition cursor-pointer"
+                >
+                  7 วันล่าสุด
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQuickDate("ALL")}
+                  className="px-2 py-1 bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 transition cursor-pointer"
+                >
+                  ล้างวันที่
+                </button>
+              </div>
             </div>
-            <div>
-              <label className="block text-[10px] text-slate-500 font-bold mb-1">ถึงวันที่:</label>
-              <input
-                type="date"
-                value={toDate}
-                onClick={(e) => e.currentTarget.showPicker?.()}
-                onChange={(e) => setToDate(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-amber-500 cursor-pointer"
-              />
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <label className="block text-[10px] text-slate-500 font-bold mb-1">ตั้งแต่วันที่:</label>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onClick={(e) => e.currentTarget.showPicker?.()}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-500 font-bold mb-1">ถึงวันที่:</label>
+                <input
+                  type="date"
+                  value={toDate}
+                  onClick={(e) => e.currentTarget.showPicker?.()}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -226,7 +276,7 @@ export default function SupervisorLogbookPage() {
           ) : filteredReports.length === 0 ? (
             <div className="text-center text-slate-400 py-10 text-xs bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
               <span className="text-xl block">📭</span>
-              <span>{(fromDate || toDate) ? "ไม่พบรายงานในช่วงวันที่เลือก" : "ยังไม่มีรายงานจากพนักงานคนอื่นในระบบ"}</span>
+              <span>ไม่พบรายงานตามเงื่อนไขที่เลือก</span>
             </div>
           ) : (
             <div className="space-y-3">

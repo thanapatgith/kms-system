@@ -5,14 +5,21 @@ import Link from "next/link";
 
 export default function SupervisorLeavesPage() {
   const [leaves, setLeaves] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
+  
+  // Modal สำหรับไม่อนุมัติ
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [selectedLeaveId, setSelectedLeaveId] = useState<string | null>(null);
   const [rejectReasonInput, setRejectReasonInput] = useState("");
+
+  // Modal สำหรับอนุมัติ + เลือกคนแทน
+  const [approveModalOpen, setApproveModalOpen] = useState(false);
+  const [selectedSubstituteId, setSelectedSubstituteId] = useState<string>("");
 
   useEffect(() => {
     fetchLeaves();
@@ -29,6 +36,7 @@ export default function SupervisorLeavesPage() {
           hasEdited: item.hasEdited || false,
         }));
         setLeaves(formatted);
+        setEmployees(data.employees || []);
       } else {
         setErrorMsg(data.error || "ไม่สามารถดึงข้อมูลการลาได้");
       }
@@ -40,11 +48,10 @@ export default function SupervisorLeavesPage() {
     }
   };
 
-  const handleAction = async (id: string, status: string, rejectReason?: string) => {
+  const handleAction = async (id: string, status: string, rejectReason?: string, substituteUserId?: string) => {
     try {
       const targetItem = leaves.find(l => l.id === id);
       
-      // ถ้ารายการนี้ถูกใช้สิทธิ์แก้ไขครบแล้ว (hasEdited เป็น true) ให้บล็อกทันที
       if (targetItem?.hasEdited) {
         alert("รายการนี้ถูกใช้สิทธิ์แก้ไขครบ 1 ครั้งแล้ว จึงไม่สามารถแก้ไขซ้ำได้อีก");
         return;
@@ -53,7 +60,12 @@ export default function SupervisorLeavesPage() {
       const res = await fetch("/api/supervisor/leaves", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status, rejectReason: rejectReason || "" }),
+        body: JSON.stringify({ 
+          id, 
+          status, 
+          rejectReason: rejectReason || "",
+          substituteUserId: substituteUserId || "" 
+        }),
       });
 
       const data = await res.json();
@@ -62,11 +74,18 @@ export default function SupervisorLeavesPage() {
           ...l, 
           status: data.data.status, 
           rejectReason: rejectReason || l.rejectReason, 
+          substituteUserId: substituteUserId || l.substituteUserId,
           hasEdited: data.data.hasEdited 
         } : l));
+        
         setRejectModalOpen(false);
+        setApproveModalOpen(false);
         setSelectedLeaveId(null);
         setRejectReasonInput("");
+        setSelectedSubstituteId("");
+        
+        // รีเฟรชข้อมูลใหม่เพื่อให้แสดงชื่อคนแทนอัปเดตทันที
+        fetchLeaves();
       } else {
         alert(data.error || "ไม่สามารถอัปเดตสถานะได้");
       }
@@ -136,7 +155,7 @@ export default function SupervisorLeavesPage() {
       <main className="max-w-md mx-auto px-4 mt-4 space-y-3">
         <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 space-y-1">
           <h2 className="text-sm font-bold text-slate-900">จัดการคำขอลาของพนักงาน</h2>
-          <p className="text-[11px] text-slate-500">ตรวจสอบและพิจารณาคำขอลา (อนุญาตให้เปลี่ยนใจได้ 1 ครั้ง)</p>
+          <p className="text-[11px] text-slate-500">ตรวจสอบและพิจารณาคำขอลา พร้อมกำหนดผู้ปฏิบัติหน้าที่แทน</p>
         </div>
 
         {errorMsg && (
@@ -167,7 +186,7 @@ export default function SupervisorLeavesPage() {
           </div>
         </div>
 
-        {/* ตัวกรองสถานะแบบกระชับ */}
+        {/* ตัวกรองสถานะ */}
         <div className="bg-white rounded-2xl shadow-sm p-3 border border-slate-200 flex gap-1.5 overflow-x-auto">
           {[
             { id: "ALL", label: "ทั้งหมด" },
@@ -227,6 +246,11 @@ export default function SupervisorLeavesPage() {
                     <div className="p-2.5 bg-white rounded-xl border border-slate-100 text-slate-800 text-[11px] space-y-1 font-medium">
                       <div>🗓️ วันที่ลา: <span className="text-slate-900 font-bold">{item.startDate} ถึง {item.endDate}</span></div>
                       {item.reason && <div className="text-slate-500">💬 เหตุผลการลา: {item.reason}</div>}
+                      {item.substituteName && (
+                        <div className="text-emerald-700 font-semibold pt-1 border-t border-slate-100 mt-1">
+                          👤 ผู้ปฏิบัติหน้าที่แทน: {item.substituteName}
+                        </div>
+                      )}
                       {item.rejectReason && (
                         <div className="text-red-600 font-semibold pt-1 border-t border-slate-100 mt-1">
                           ❌ เหตุผลที่ไม่อนุมัติ: {item.rejectReason}
@@ -234,7 +258,6 @@ export default function SupervisorLeavesPage() {
                       )}
                     </div>
 
-                    {/* จัดการปุ่มกดและการล็อกสถานะ */}
                     <div className="pt-2 border-t border-slate-200/60 flex flex-col gap-2">
                       <div className="flex justify-between items-center text-[10px]">
                         {!isPending && !item.hasEdited && (
@@ -252,7 +275,6 @@ export default function SupervisorLeavesPage() {
                         <div className="text-center text-slate-400 italic py-1 text-[10px]">ไม่สามารถแก้ไขสถานะได้อีก</div>
                       ) : (
                         <div className="grid grid-cols-2 gap-2">
-                          {/* ปุ่มไม่อนุมัติ: ปิดการใช้งานถ้าน้องหรือพนักงานคนนี้ถูกกดไม่อนุมัติอยู่แล้ว */}
                           <button
                             disabled={isRejected}
                             onClick={() => { setSelectedLeaveId(item.id); setRejectModalOpen(true); }}
@@ -265,10 +287,9 @@ export default function SupervisorLeavesPage() {
                             ✕ ไม่อนุมัติ
                           </button>
 
-                          {/* ปุ่มอนุมัติ: ปิดการใช้งานถ้าน้องหรือพนักงานคนนี้ถูกกดอนุมัติอยู่แล้ว */}
                           <button
                             disabled={isApproved}
-                            onClick={() => handleAction(item.id, "APPROVED")}
+                            onClick={() => { setSelectedLeaveId(item.id); setSelectedSubstituteId(""); setApproveModalOpen(true); }}
                             className={`w-full py-1.5 font-bold rounded-xl text-[11px] text-center shadow-sm transition ${
                               isApproved 
                                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60' 
@@ -288,10 +309,43 @@ export default function SupervisorLeavesPage() {
         </div>
       </main>
 
+      {/* Modal อนุมัติ + เลือกคนแทน */}
+      {approveModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-slate-200 text-xs">
+            <h3 className="text-sm font-bold text-slate-900">👤 เลือกผู้ปฏิบัติหน้าที่แทน</h3>
+            <p className="text-[11px] text-slate-500">กรุณาเลือกพนักงานที่จะมาปฏิบัติหน้าที่แทนในช่วงเวลานี้</p>
+            
+            <select
+              value={selectedSubstituteId}
+              onChange={(e) => setSelectedSubstituteId(e.target.value)}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:bg-white cursor-pointer"
+            >
+              <option value="">-- เลือกพนักงานผู้ปฏิบัติหน้าที่แทน --</option>
+              {employees.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.name || emp.employeeCode}
+                </option>
+              ))}
+            </select>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setApproveModalOpen(false)} className="px-3.5 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs cursor-pointer">ยกเลิก</button>
+              <button 
+                onClick={() => handleAction(selectedLeaveId!, "APPROVED", "", selectedSubstituteId)} 
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs cursor-pointer shadow-sm"
+              >
+                ยืนยันการอนุมัติ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal ปฏิเสธ */}
       {rejectModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-slate-200">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-slate-200 text-xs">
             <h3 className="text-sm font-bold text-slate-900">❌ ระบุเหตุผลการไม่อนุมัติ</h3>
             <textarea
               rows={3}
@@ -302,7 +356,7 @@ export default function SupervisorLeavesPage() {
             />
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setRejectModalOpen(false)} className="px-3.5 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs cursor-pointer">ยกเลิก</button>
-              <button onClick={() => handleAction(selectedLeaveId!, "REJECTED", rejectReasonInput)} className="px-4 py-2 bg-red-600 text-white font-bold rounded-xl text-xs cursor-pointer">ยืนยัน</button>
+              <button onClick={() => handleAction(selectedLeaveId!, "REJECTED", rejectReasonInput)} className="px-4 py-2 bg-red-600 text-white font-bold rounded-xl text-xs cursor-pointer shadow-sm">ยืนยัน</button>
             </div>
           </div>
         </div>

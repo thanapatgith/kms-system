@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// 1. ดึงข้อมูลโปรไฟล์ (GET)
 export async function GET(req: Request) {
   try {
     const session = await getSession();
@@ -26,10 +26,36 @@ export async function GET(req: Request) {
 
     let dailyRate = 520;
     let baseWage8Hrs = 400; 
-    let otRate4Hrs = 120; // ค่า OT 4 ชั่วโมง (โอทีรายชั่วโมง * 4)
-    let branchName = "หน่วยงานสังกัด KMS";
+    let otRate4Hrs = 120; 
+    let branchName = "ยังไม่ระบุหน่วยงาน";
 
-    // คำนวณรอบวันทำงาน (นับจากวันที่ 11)
+    // ดึงชื่อไซต์จากตาราง sites โดยใช้ Prisma Model หรือ query พื้นฐานที่ปลอดภัย
+    const siteId = user.site_id || user.siteId;
+    if (siteId) {
+      try {
+        // ค้นหาผ่าน Prisma ตาราง sites (รองรับทั้ง PascalCase และ lowercase ตาม schema)
+        const siteData = await (prisma as any).site?.findUnique({
+          where: { id: String(siteId) },
+          select: { siteName: true },
+        }) || await (prisma as any).sites?.findUnique({
+          where: { id: String(siteId) },
+          select: { site_name: true },
+        });
+
+        if (siteData) {
+          branchName = siteData.siteName || siteData.site_name || "ยังไม่ระบุหน่วยงาน";
+        } else {
+          // Fallback ใช้ query ตรงถ้าโมเดล Prisma ไม่แมตช์
+          const rawSite: any = await prisma.$queryRaw`SELECT site_name FROM sites WHERE id::text = ${String(siteId)} LIMIT 1`;
+          if (rawSite && rawSite.length > 0 && rawSite[0].site_name) {
+            branchName = rawSite[0].site_name;
+          }
+        }
+      } catch (dbErr) {
+        console.error("Fetch site error:", dbErr);
+      }
+    }
+
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
@@ -53,37 +79,23 @@ export async function GET(req: Request) {
         .maybeSingle();
 
       if (payrollData) {
-        // ดึงค่า wage และ overtime_pay จาก database โดยตรงแบบไดนามิก
-        const dbWage = Number(payrollData.wage) || 400; // ค่าจ้างปกติ 8 ชม.
-        const dbOtPerHour = Number(payrollData.overtime_pay) || 30; // เรท OT ต่อชั่วโมง
+        const dbWage = Number(payrollData.wage) || 400; 
+        const dbOtPerHour = Number(payrollData.overtime_pay) || 30; 
 
         baseWage8Hrs = dbWage;
-        otRate4Hrs = dbOtPerHour * 4; // นำเรท OT มาคูณ 4 ชั่วโมง (ทำงาน 12 ชม. รวม OT 4 ชม.)
-        dailyRate = baseWage8Hrs + otRate4Hrs; // รวมเป็นเรทรายวันต่อวัน (12 ชม.)
+        otRate4Hrs = dbOtPerHour * 4; 
+        dailyRate = baseWage8Hrs + otRate4Hrs; 
 
         totalDeductions = Number(payrollData?.total_deductions) || 0;
 
-        if (payrollData?.site_name) {
+        if (branchName === "ยังไม่ระบุหน่วยงาน" && payrollData?.site_name && payrollData.site_name !== "หน่วยงานสังกัด KMS") {
           branchName = payrollData.site_name;
         }
       }
     }
 
-    // คำนวณรายได้สะสมจากอัตราค่าจ้างรายวันจริง × จำนวนวันที่ทำงาน
     grossIncome = dailyRate * workedDays;
     netSalary = grossIncome - totalDeductions;
-
-    if (branchName === "หน่วยงานสังกัด KMS" && user.site_id) {
-      const { data: siteData } = await supabase
-        .from("sites")
-        .select("site_name")
-        .eq("id", user.site_id)
-        .maybeSingle();
-
-      if (siteData?.site_name) {
-        branchName = siteData.site_name;
-      }
-    }
 
     const userImage = user.avatar_url || user.image || null;
 
@@ -102,9 +114,9 @@ export async function GET(req: Request) {
         age: user.age || null,
         gender: user.gender || "-",
         branch: branchName,
-        dailyRate: dailyRate,       // เรทรายวันรวม 12 ชม.
-        baseWage8Hrs: baseWage8Hrs, // ค่าจ้างปกติ 8 ชม.
-        otRate: otRate4Hrs,         // ค่า OT 4 ชม. (คำนวณจาก overtime_pay * 4)
+        dailyRate: dailyRate,
+        baseWage8Hrs: baseWage8Hrs,
+        otRate: otRate4Hrs,
         workedDays: workedDays,
         grossIncome: grossIncome,
         netSalary: netSalary,
@@ -118,7 +130,6 @@ export async function GET(req: Request) {
   }
 }
 
-// 2. อัปเดตข้อมูลส่วนตัว / เปลี่ยนรหัสผ่าน / อัปโหลดรูปภาพ (PUT)
 export async function PUT(req: Request) {
   try {
     const session = await getSession();

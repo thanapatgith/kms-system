@@ -25,8 +25,10 @@ export async function GET(req: Request) {
     });
 
     const siteIds = Array.from(new Set(users.map((u: any) => u.siteId).filter(Boolean)));
-    const sites = await prisma.site ? await prisma.site.findMany({ where: { id: { in: siteIds } } }) : [];
-    const siteMap = new Map(sites.map((s: any) => [s.id, s.name]));
+    
+    // ดึงข้อมูลไซต์ และรองรับทั้งฟิลด์ name และ siteName
+    const sites = siteIds.length > 0 ? await prisma.site.findMany({ where: { id: { in: siteIds } } }) : [];
+    const siteMap = new Map(sites.map((s: any) => [s.id, s.name || s.siteName || "-"]));
 
     const userMap = new Map(users.map((u: any) => [
       u.id, 

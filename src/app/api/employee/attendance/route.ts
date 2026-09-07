@@ -23,18 +23,45 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const action = searchParams.get("action");
 
-    // เพิ่มส่วนนี้เข้าไป: ถ้าหน้าบ้านขอรายชื่อหน่วยงาน ให้ดึงส่งกลับไปให้ Dropdown
     if (action === "sites") {
-      const userList = (await prisma.$queryRaw`
-        SELECT site_id FROM users WHERE id = ${session.userId} LIMIT 1
-      `.catch(() => [])) as any[];
+      let targetSiteId: string | null = null;
+      
+      const thaiNow = getThaiCurrentDate();
+      const year = thaiNow.getFullYear();
+      const month = String(thaiNow.getMonth() + 1).padStart(2, '0');
+      const day = String(thaiNow.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
 
-      const userSiteId = userList[0]?.site_id;
+      // ตรวจสอบกะปฏิบัติหน้าที่แทน (รองรับกรณี end_date เป็น NULL)
+      try {
+        const replacements: any = await prisma.$queryRaw`
+          SELECT site_id 
+          FROM public.shift_replacements 
+          WHERE replacement_employee_id = ${session.userId}
+            AND LOWER(status) = 'approved'
+            AND start_date::date <= ${todayStr}::date
+            AND (end_date IS NULL OR end_date::date >= ${todayStr}::date)
+          LIMIT 1
+        `;
+        if (replacements && replacements.length > 0 && replacements[0].site_id) {
+          targetSiteId = replacements[0].site_id;
+        }
+      } catch (repErr) {
+        console.error("Check replacement site error:", repErr);
+      }
+
+      if (!targetSiteId) {
+        const userList = (await prisma.$queryRaw`
+          SELECT site_id FROM users WHERE id = ${session.userId} LIMIT 1
+        `.catch(() => [])) as any[];
+        targetSiteId = userList[0]?.site_id || null;
+      }
+
       let sitesList: any[] = [];
 
-      if (userSiteId) {
+      if (targetSiteId) {
         const sites = (await prisma.$queryRaw`
-          SELECT id, site_name FROM sites WHERE id = ${userSiteId} LIMIT 1
+          SELECT id, site_name FROM sites WHERE id = ${targetSiteId} LIMIT 1
         `.catch(() => [])) as any[];
 
         if (sites.length > 0) {
@@ -52,7 +79,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, sites: sitesList });
     }
 
-    // โค้ดเดิม: ดึงประวัติการลงเวลา
     const attendances = await prisma.attendance.findMany({
       where: { userId: session.userId },
       orderBy: { createdAt: "asc" },
@@ -84,7 +110,7 @@ export async function GET(req: Request) {
           locationIn: latLngStr,
           locationOut: "-",
           imagesIn: item.images || [], 
-          imagesOut: [],               
+          imagesOut: [],              
           status: "ปกติ",
         });
       } else if (item.type === "CHECK_OUT") {
@@ -118,7 +144,6 @@ export async function GET(req: Request) {
   }
 }
 
-// 2. บันทึกเช็คอิน / เช็คเอาท์ พร้อมพิกัดและ siteId (POST)
 export async function POST(req: Request) {
   try {
     const session = await getSession();
@@ -128,7 +153,7 @@ export async function POST(req: Request) {
 
     const formData = await req.formData();
     const type = formData.get("type") as string;
-    const siteId = formData.get("siteId") as string; // รับค่า siteId ที่ส่งมาจากหน้าบ้าน
+    const siteId = formData.get("siteId") as string; 
     const latitude = formData.get("latitude");
     const longitude = formData.get("longitude");
     const imageFiles = formData.getAll("images") as File[];
@@ -175,11 +200,10 @@ export async function POST(req: Request) {
       }
     }
 
-    // บันทึกลงฐานข้อมูล (เพิ่ม siteId เข้าไปบันทึกด้วย)
     const newAttendance = await prisma.attendance.create({
       data: {
         userId: session.userId,
-        siteId: siteId || null, // บันทึกรหัสหน่วยงาน
+        siteId: siteId || null, 
         type: type,
         latitude: Number(latitude),
         longitude: Number(longitude),

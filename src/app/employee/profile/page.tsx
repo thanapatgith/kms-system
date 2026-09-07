@@ -14,7 +14,7 @@ export default function EmployeeProfilePage() {
     totalBorrowedThisMonth: 0,
     remainingCredit: 10000,
   });
-  const [leavesCount, setLeavesCount] = useState(0); // จำนวนวันที่ใช้ไปแล้ว
+  const [leavesCount, setLeavesCount] = useState(0);
 
   const [showNotiModal, setShowNotiModal] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -79,7 +79,6 @@ export default function EmployeeProfilePage() {
   
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
-  // คำนวณสิทธิ์วันลา (โควตา 3 วันต่อปี)
   const totalLeaveQuota = 3;
   const remainingLeaveDays = Math.max(0, totalLeaveQuota - leavesCount);
 
@@ -125,7 +124,7 @@ export default function EmployeeProfilePage() {
         {/* ใช้ Component ร่วมกันสำหรับการ์ดสรุปยอดเงินและวันทำงาน */}
         <SalarySummaryCard
           name={profile?.name}
-          branch={profile?.branch}
+          siteName={profile?.siteName || profile?.branch}
           workedDays={workedDays}
           grossEarnings={grossEarnings}
           totalDeductions={totalDeduction}

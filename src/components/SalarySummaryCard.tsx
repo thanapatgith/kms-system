@@ -2,7 +2,7 @@
 
 interface SalarySummaryCardProps {
   name: string;
-  branch: string;
+  siteName: string;
   workedDays: number;
   grossEarnings: number;
   totalDeductions: number;
@@ -14,7 +14,7 @@ interface SalarySummaryCardProps {
 
 export default function SalarySummaryCard({
   name,
-  branch,
+  siteName,
   workedDays,
   grossEarnings,
   totalDeductions,
@@ -23,6 +23,11 @@ export default function SalarySummaryCard({
   roleBadgeBg = "bg-orange-500",
   roleBadgeText = "text-white",
 }: SalarySummaryCardProps) {
+  // แสดงชื่อไซต์ตามที่ส่งมา ถ้าไม่มีจริงๆ ถึงแสดงสำนักงานใหญ่
+  const displaySite = (!siteName || siteName === "ยังไม่ระบุหน่วยงาน") 
+    ? "สำนักงานใหญ่" 
+    : siteName;
+
   return (
     <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-5 shadow-xl space-y-4 border border-slate-700">
       <div className="flex justify-between items-start gap-2">
@@ -38,7 +43,7 @@ export default function SalarySummaryCard({
             </p>
           </div>
           <p className="text-xs text-orange-400 font-bold truncate">
-            📍 {branch || "หน่วยงานสังกัด KMS"}
+            📍 {displaySite}
           </p>
         </div>
         <span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-xs font-bold shrink-0">
@@ -77,7 +82,7 @@ export default function SalarySummaryCard({
               <span className="block text-[10px] font-sans text-transparent">&nbsp;</span>
             </div>
             <span className="font-extrabold text-red-400 text-sm mt-2">
-              {totalDeductions > 0 ? `-฿{totalDeductions.toLocaleString()}` : "-"}
+              {totalDeductions > 0 ? `-฿${totalDeductions.toLocaleString()}` : "-"}
             </span>
           </div>
         </div>

@@ -102,7 +102,6 @@ export default function SupervisorDashboardPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* กดแล้วพาไปหน้า /supervisor/settings ทันที */}
             <button
               onClick={() => router.push("/supervisor/settings")}
               className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-sm"
@@ -129,7 +128,6 @@ export default function SupervisorDashboardPage() {
       {/* Main Content */}
       <main className="max-w-md mx-auto px-4 mt-4 space-y-4">
         
-        {/* ใช้ Component ร่วมกันสำหรับการ์ดสรุปยอดเงิน */}
         <SalarySummaryCard
           name={profile?.name || stats.employeeName}
           branch={profile?.branch || profile?.site?.siteName}
@@ -203,6 +201,15 @@ export default function SupervisorDashboardPage() {
               <div>
                 <span className="font-bold text-amber-900 block">สุ่มตรวจหน้างาน</span>
                 <span className="text-[10px] text-amber-700">เช็กอิน & ถ่ายรูปหน่วยงาน</span>
+              </div>
+            </Link>
+
+            {/* เพิ่มเมนูจัดการบุคลากร (รปภ.) ที่นี่ */}
+            <Link href="/supervisor/employees" className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm hover:border-amber-400 transition flex items-center gap-3 col-span-2">
+              <span className="text-xl">👥</span>
+              <div>
+                <span className="font-bold text-slate-900 block">จัดการบุคลากร & มอบหมายไซต์งาน</span>
+                <span className="text-[10px] text-slate-400">เพิ่ม, แก้ไขข้อมูล รปภ. และกำหนดหน่วยงานประจำ</span>
               </div>
             </Link>
           </div>
