@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -17,6 +17,11 @@ export default function CreateReportPage() {
   const [selectedBranch, setSelectedBranch] = useState("");
   const [branchesList, setBranchesList] = useState<string[]>([]);
 
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+
   useEffect(() => {
     fetchUserProfile();
 
@@ -30,10 +35,15 @@ export default function CreateReportPage() {
         },
         (err) => {
           console.warn("Geolocation error:", err);
+          setErrorMsg("ไม่สามารถดึงตำแหน่ง GPS ได้ กรุณาเปิดใช้งาน Location ในเบราว์เซอร์");
         },
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: true, timeout: 15000 }
       );
     }
+
+    return () => {
+      stopCamera();
+    };
   }, []);
 
   const fetchUserProfile = async () => {
@@ -106,23 +116,82 @@ export default function CreateReportPage() {
     });
   };
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files);
-      setLoading(true);
-
-      try {
-        const compressedFiles = await Promise.all(selectedFiles.map((file) => compressImage(file)));
-        const newImages = [...images, ...compressedFiles];
-        setImages(newImages);
-
-        const newPreviews = compressedFiles.map((file) => URL.createObjectURL(file));
-        setPreviews([...previews, ...newPreviews]);
-      } catch (err) {
-        console.error("Compression error:", err);
-      } finally {
-        setLoading(false);
+  const startCamera = async () => {
+    setErrorMsg("");
+    setShowCameraModal(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: "environment",
+          width: { ideal: 768 },
+          height: { ideal: 1024 }
+        },
+        audio: false,
+      });
+      setCameraStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
       }
+    } catch (err) {
+      console.error("Camera error:", err);
+      setErrorMsg("ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการเข้าถึงกล้องในเบราว์เซอร์");
+      setShowCameraModal(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+  };
+
+  const capturePhoto = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    const targetWidth = 600;
+    const targetHeight = 800;
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      const videoRatio = video.videoWidth / video.videoHeight;
+      const targetRatio = targetWidth / targetHeight;
+      let renderWidth = video.videoWidth;
+      let renderHeight = video.videoHeight;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (videoRatio > targetRatio) {
+        renderWidth = video.videoHeight * targetRatio;
+        offsetX = (video.videoWidth - renderWidth) / 2;
+      } else {
+        renderHeight = video.videoWidth / targetRatio;
+        offsetY = (video.videoHeight - renderHeight) / 2;
+      }
+
+      ctx.drawImage(video, offsetX, offsetY, renderWidth, renderHeight, 0, 0, targetWidth, targetHeight);
+
+      canvas.toBlob(async (blob) => {
+        if (blob) {
+          const file = new File([blob], `report_${Date.now()}.jpg`, { type: "image/jpeg" });
+          setLoading(true);
+          try {
+            const compressedFile = await compressImage(file);
+            setImages((prev) => [...prev, compressedFile]);
+            setPreviews((prev) => [...prev, URL.createObjectURL(compressedFile)]);
+          } catch (err) {
+            console.error("Compression error:", err);
+          } finally {
+            setLoading(false);
+            stopCamera();
+            setShowCameraModal(false);
+          }
+        }
+      }, "image/jpeg", 0.85);
     }
   };
 
@@ -140,6 +209,16 @@ export default function CreateReportPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
+
+    if (location?.lat === null || location?.lng === null || location === undefined) {
+      setErrorMsg("ยังไม่พบพิกัด GPS กรุณารอสักครู่");
+      return;
+    }
+
+    if (images.length === 0) {
+      setErrorMsg("กรุณาถ่ายรูปประกอบการตรวจตราอย่างน้อย 1 รูป");
+      return;
+    }
 
     if (!message.trim()) {
       setErrorMsg("กรุณาระบุข้อความรายงาน");
@@ -175,6 +254,8 @@ export default function CreateReportPage() {
       setLoading(false);
     }
   };
+
+  const isFormValid = location?.lat !== null && location?.lng !== null && images.length > 0 && message.trim() !== "";
 
   return (
     <div className="w-full min-h-screen bg-slate-100 pb-24">
@@ -217,14 +298,21 @@ export default function CreateReportPage() {
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 space-y-3">
-            <label className="block text-xs font-bold text-slate-800">
-              📸 รูปภาพประกอบการตรวจตรา *
-            </label>
+            <div className="flex justify-between items-center">
+              <label className="block text-xs font-bold text-slate-800">
+                📸 รูปภาพประกอบการตรวจตรา *
+              </label>
+              {images.length === 0 && (
+                <span className="text-red-500 font-bold text-[10px] bg-red-50 px-2 py-0.5 rounded-md border border-red-200 animate-pulse">
+                  ⚠️ ต้องถ่ายรูปอย่างน้อย 1 รูป
+                </span>
+              )}
+            </div>
 
             {previews.length > 0 && (
               <div className="grid grid-cols-3 gap-2 mb-2">
                 {previews.map((src, idx) => (
-                  <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200">
+                  <div key={idx} className="relative aspect-[3/4] rounded-xl overflow-hidden border border-slate-200 shadow-sm">
                     <img src={src} alt="preview" className="w-full h-full object-cover" />
                     <button
                       type="button"
@@ -238,19 +326,14 @@ export default function CreateReportPage() {
               </div>
             )}
 
-            <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-orange-300 hover:border-orange-500 rounded-2xl bg-orange-50/50 cursor-pointer transition">
+            <div
+              onClick={startCamera}
+              className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-orange-300 hover:border-orange-500 rounded-2xl bg-orange-50/50 cursor-pointer transition shadow-inner"
+            >
               <span className="text-2xl mb-1">📷</span>
-              <span className="text-xs font-bold text-orange-600">กดเพื่อถ่ายรูป / เลือกรูปภาพ</span>
+              <span className="text-xs font-bold text-orange-600">กดเพื่อเปิดกล้องถ่ายภาพ (แนวตั้ง 3:4)</span>
               <span className="text-[10px] text-slate-400 mt-0.5">ถ่ายภาพพื้นที่ตรวจ หรือถ่ายภาพตนเอง</span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                capture="environment"
-                onChange={handleImageChange}
-                className="hidden"
-              />
-            </label>
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 space-y-2.5">
@@ -305,23 +388,73 @@ export default function CreateReportPage() {
 
           <div className="px-2 flex items-center justify-between text-[10px] text-slate-500">
             <span>📍 พิกัด GPS ยืนยันตำแหน่ง:</span>
-            <span className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200">
-              {location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : "กำลังค้นหาพิกัด..."}
-            </span>
+            {location ? (
+              <span className="font-mono bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded border border-emerald-200 font-bold">
+                {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+              </span>
+            ) : (
+              <span className="font-mono bg-amber-50 text-amber-600 px-2 py-0.5 rounded border border-amber-200 font-bold animate-pulse">
+                กำลังค้นหาพิกัด...
+              </span>
+            )}
           </div>
+
+          {!isFormValid && (
+            <div className="text-[11px] text-center text-amber-600 font-bold bg-amber-50 py-2 px-3 rounded-xl border border-amber-200 animate-pulse">
+              ⚠️ กรุณารอพิกัด GPS และถ่ายรูปอย่างน้อย 1 รูป ก่อนส่งรายงาน
+            </div>
+          )}
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm rounded-2xl shadow-lg shadow-orange-500/20 transition disabled:opacity-50 cursor-pointer"
+            disabled={loading || !isFormValid}
+            className="w-full py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm rounded-2xl shadow-lg shadow-orange-500/20 transition disabled:opacity-50 disabled:bg-slate-400 cursor-pointer"
           >
             {loading ? "กำลังประมวลผลรูปภาพ / ส่งรายงาน..." : "🚀 ส่งรายงานการตรวจตรา"}
           </button>
         </form>
       </main>
 
+      {showCameraModal && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-between p-4 pb-24">
+          <div className="w-full flex justify-between items-center text-white py-1">
+            <span className="text-xs font-bold">📷 ถ่ายภาพประกอบการตรวจตรา (แนวตั้ง 3:4)</span>
+            <button
+              onClick={() => {
+                stopCamera();
+                setShowCameraModal(false);
+              }}
+              className="text-white bg-slate-800 hover:bg-slate-700 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="relative w-full max-w-[280px] aspect-[3/4] flex items-center justify-center overflow-hidden rounded-2xl bg-black my-auto shadow-2xl border border-slate-700">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="absolute inset-0 w-full h-full object-cover"
+            ></video>
+          </div>
+
+          <canvas ref={canvasRef} className="hidden"></canvas>
+
+          <div className="w-full max-w-md pb-2 flex justify-center items-center">
+            <button
+              onClick={capturePhoto}
+              className="w-16 h-16 rounded-full bg-white border-4 border-slate-300 shadow-2xl flex items-center justify-center active:scale-95 transition cursor-pointer"
+            >
+              <div className="w-12 h-12 rounded-full bg-orange-600"></div>
+            </button>
+          </div>
+        </div>
+      )}
+
       {showSuccessModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl p-6 max-w-xs w-full text-center space-y-4 shadow-2xl border border-slate-100">
             <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto shadow-inner">
               ✓

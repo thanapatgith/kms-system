@@ -144,6 +144,7 @@ export async function GET(req: Request) {
   }
 }
 
+// 2. บันทึกเช็คอิน / เช็คเอาท์ พร้อมพิกัดและ siteId (POST)
 export async function POST(req: Request) {
   try {
     const session = await getSession();
@@ -153,7 +154,7 @@ export async function POST(req: Request) {
 
     const formData = await req.formData();
     const type = formData.get("type") as string;
-    const siteId = formData.get("siteId") as string; 
+    const branchName = formData.get("branch") as string; // รับค่าชื่อสาขาจากหน้าบ้าน
     const latitude = formData.get("latitude");
     const longitude = formData.get("longitude");
     const imageFiles = formData.getAll("images") as File[];
@@ -164,6 +165,17 @@ export async function POST(req: Request) {
 
     if (!imageFiles || imageFiles.length === 0) {
       return NextResponse.json({ ok: false, error: "กรุณาแนบรูปภาพอย่างน้อย 1 รูป" }, { status: 400 });
+    }
+
+    // แปลงชื่อสาขา (branch) ให้เป็น site_id (UUID)
+    let siteUuid: string | null = null;
+    if (branchName) {
+      const foundSite: any = await prisma.$queryRaw`
+        SELECT id FROM sites WHERE site_name = ${branchName} LIMIT 1
+      `.catch(() => []);
+      if (foundSite && foundSite.length > 0) {
+        siteUuid = foundSite[0].id;
+      }
     }
 
     const thaiNow = getThaiCurrentDate();
@@ -200,10 +212,11 @@ export async function POST(req: Request) {
       }
     }
 
+    // บันทึกลงฐานข้อมูล (ใช้ siteId ตาม schema ที่ประกาศไว้)
     const newAttendance = await prisma.attendance.create({
       data: {
         userId: session.userId,
-        siteId: siteId || null, 
+        siteId: siteUuid, 
         type: type,
         latitude: Number(latitude),
         longitude: Number(longitude),

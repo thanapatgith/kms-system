@@ -84,6 +84,7 @@ model Site {
 
   client          Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
   users           User[]
+  attendances     Attendance[]
 
   @@index([siteName])
   @@index([clientId])
@@ -198,14 +199,20 @@ model ContactInquiry {
 
 model Attendance {
   id        String   @id @default(cuid())
-  userId    String
+  userId    String   @map("user_id")
+  siteId    String?  @map("site_id")
   type      String   
   latitude  Float
   longitude Float
   images    String[] 
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
   
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  site      Site?    @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([siteId])
+  @@map("attendances")
 }
 
 model IncidentReport {
