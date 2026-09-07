@@ -133,7 +133,15 @@ export async function GET(req: Request) {
     });
     allFormatted.reverse();
 
-    return NextResponse.json({ ok: true, attendance: allFormatted }, {
+    // ตรวจสอบสถานะการทำงานจากเรกคอร์ดล่าสุดทั้งหมด (แม่นยำที่สุด)
+    const lastRecord = attendances[attendances.length - 1];
+    const isCurrentlyWorking = lastRecord ? lastRecord.type === "CHECK_IN" : false;
+
+    return NextResponse.json({ 
+      ok: true, 
+      attendance: allFormatted, 
+      isWorking: isCurrentlyWorking 
+    }, {
       headers: {
         'Cache-Control': 'no-store, max-age=0',
       },
@@ -179,20 +187,15 @@ export async function POST(req: Request) {
     }
 
     const thaiNow = getThaiCurrentDate();
-    const todayStart = new Date(thaiNow);
-    todayStart.setHours(0, 0, 0, 0);
 
-    const todayRecords = await prisma.attendance.findMany({
-      where: {
-        userId: session.userId,
-        createdAt: { gte: todayStart },
-      },
+    // ตรวจสอบสถานะกะล่าสุดจากประวัติทั้งหมดของ user
+    const allRecords = await prisma.attendance.findMany({
+      where: { userId: session.userId },
       orderBy: { createdAt: "asc" },
     });
 
-    const checkIns = todayRecords.filter((r: any) => r.type === "CHECK_IN");
-    const checkOuts = todayRecords.filter((r: any) => r.type === "CHECK_OUT");
-    const isCurrentlyWorking = checkIns.length > checkOuts.length;
+    const lastRecord = allRecords[allRecords.length - 1];
+    const isCurrentlyWorking = lastRecord ? lastRecord.type === "CHECK_IN" : false;
 
     if (type === "CHECK_IN" && isCurrentlyWorking) {
       return NextResponse.json({ ok: false, error: "คุณกำลังอยู่ในกะที่ปฏิบัติงานอยู่ ต้องเช็คเอาท์ก่อนเริ่มกะใหม่" }, { status: 400 });

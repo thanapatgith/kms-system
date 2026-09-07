@@ -6,6 +6,7 @@ import Link from "next/link";
 export default function EmployeeAttendancePage() {
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
+  const [isWorking, setIsWorking] = useState(false); // ควบคุมสถานะกำลังทำงานโดยตรงจาก API
   const [message, setMessage] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [location, setLocation] = useState<{ lat: number | null; lng: number | null }>({ lat: null, lng: null });
@@ -54,6 +55,19 @@ export default function EmployeeAttendancePage() {
       const data = await res.json();
       if (data.ok) {
         setHistory(data.attendance || []);
+        // ตรวจสอบสถานะ isWorking จาก API โดยตรง (ถ้ามีกะล่าสุดที่ยังไม่เช็คเอาท์)
+        if (typeof data.isWorking === "boolean") {
+          setIsWorking(data.isWorking);
+        } else {
+          // Fallback เผื่อ API เก่า เช็คจากรายการล่าสุดของวันนี้
+          const todayStr = new Date().toISOString().split("T")[0];
+          const todayRecords = (data.attendance || []).filter((item: any) => {
+            if (!item.rawDate) return false;
+            return new Date(item.rawDate).toISOString().split("T")[0] === todayStr;
+          });
+          const active = todayRecords.find((item: any) => item.checkIn && item.checkIn !== "-" && (!item.checkOut || item.checkOut === "-"));
+          setIsWorking(!!active);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -88,9 +102,6 @@ export default function EmployeeAttendancePage() {
     const itemDateStr = new Date(item.rawDate).toISOString().split("T")[0];
     return itemDateStr === todayString;
   });
-  
-  const activeRecord = todayRecords.find(item => item.checkIn && item.checkIn !== "-" && (!item.checkOut || item.checkOut === "-"));
-  const isWorking = !!activeRecord;
 
   const startCamera = async () => {
     setErrorMsg("");
