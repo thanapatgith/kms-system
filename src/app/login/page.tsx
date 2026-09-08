@@ -59,16 +59,8 @@ export default function LoginPage() {
   return (
     <main className="grid min-h-screen place-items-center bg-slate-900 p-5 font-sans">
       <section className="w-full max-w-md rounded-2xl bg-white p-7 shadow-2xl border border-slate-100">
-        <a href="/" className="text-sm font-bold text-orange-500 hover:underline">
-          ← กลับหน้าเว็บไซต์
-        </a>
-
+        
         <div className="mt-6">
-          <img
-            src="https://i.ibb.co/27TDqzHM/680211-removebg-preview.png"
-            alt="KMS Logo"
-            className="h-12 w-auto object-contain rounded"
-          />
           <h1 className="mt-4 text-2xl font-bold text-slate-900">Login ระบบ</h1>
           <p className="mt-1 text-sm text-slate-500">เข้าสู่ระบบพนักงานและลูกค้า (Customer Portal)</p>
         </div>
