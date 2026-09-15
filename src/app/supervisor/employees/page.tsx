@@ -19,7 +19,8 @@ export default function SupervisorEmployeesPage() {
   const [name, setName] = useState("");
   const [employeeCode, setEmployeeCode] = useState("");
   const [phone, setPhone] = useState("");
-  const [dailyRate, setDailyRate] = useState("");
+  const [baseWage8Hrs, setBaseWage8Hrs] = useState("400");
+  const [otWage4Hrs, setOtWage4Hrs] = useState("120");
   const [siteId, setSiteId] = useState("");
 
   // Confirm Modals State
@@ -85,7 +86,8 @@ export default function SupervisorEmployeesPage() {
     setName("");
     setEmployeeCode(generateNextEmployeeCode(employees));
     setPhone("");
-    setDailyRate("");
+    setBaseWage8Hrs("400");
+    setOtWage4Hrs("120");
     setSiteId("");
     setShowModal(true);
   };
@@ -96,7 +98,13 @@ export default function SupervisorEmployeesPage() {
     setName(emp.name || "");
     setEmployeeCode(emp.employeeCode || "");
     setPhone(emp.phone || "");
-    setDailyRate(emp.dailyRate ? emp.dailyRate.toString() : "");
+    setBaseWage8Hrs(emp.baseWage8Hrs ? emp.baseWage8Hrs.toString() : "400");
+    
+    // ⭐ ปรับปรุงจุดนี้: ดึงค่า OT ตามจริงโดยตรง (ถ้าค่าน้อยกว่า 60 ให้คูณ 4 เผื่อข้อมูลเก่า)
+    const rawOt = emp.otRate4Hrs !== undefined ? Number(emp.otRate4Hrs) : 120;
+    const finalOt = rawOt < 60 ? rawOt * 4 : rawOt;
+    setOtWage4Hrs(finalOt.toString());
+
     setSiteId(emp.siteId || "");
     setShowModal(true);
   };
@@ -106,9 +114,10 @@ export default function SupervisorEmployeesPage() {
     try {
       const url = "/api/supervisor/employees";
       const method = isEditing ? "PUT" : "POST";
+      
       const body = isEditing 
-        ? { id: currentId, name, phone, dailyRate, siteId }
-        : { name, employeeCode, phone, dailyRate, siteId };
+        ? { id: currentId, name, phone, baseWage8Hrs, otWage4Hrs, siteId }
+        : { name, employeeCode, phone, baseWage8Hrs, otWage4Hrs, siteId };
 
       const res = await fetch(url, {
         method,
@@ -121,7 +130,7 @@ export default function SupervisorEmployeesPage() {
         setShowModal(false);
         showToast(
           isEditing ? "อัปเดตข้อมูลสำเร็จ" : "เพิ่มพนักงานใหม่สำเร็จ",
-          isEditing ? "บันทึกการเปลี่ยนแปลงข้อมูลพนักงานเรียบร้อยแล้ว" : `เพิ่มรหัสพนักงาน ${employeeCode} เข้าสู่ระบบแล้ว (รหัสผ่านเริ่มต้น: password123)`,
+          isEditing ? "บันทึกการเปลี่ยนแปลงข้อมูลพนักงานเรียบร้อยแล้ว" : `เพิ่มรหัสพนักงาน ${employeeCode} เข้าสู่ระบบแล้ว`,
           "success"
         );
         fetchData();
@@ -274,6 +283,12 @@ export default function SupervisorEmployeesPage() {
                   </div>
                 </div>
 
+                {/* แสดงแจกแจงย่อย 8 ชม. และ OT ที่บันทึกจริง */}
+                <div className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-xl border border-slate-100 flex justify-between font-mono">
+                  <span>• ปกติ 8 ชม.: <strong>฿{emp.baseWage8Hrs || 400}</strong></span>
+                  <span>• OT 4 ชม.: <strong className="text-amber-700">฿{emp.otRate4Hrs || 120}</strong></span>
+                </div>
+
                 <div className="flex justify-end pt-1">
                   <button
                     onClick={() => openEditModal(emp)}
@@ -291,7 +306,7 @@ export default function SupervisorEmployeesPage() {
       {/* Modal เพิ่ม / แก้ไขพนักงาน */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-slate-100 text-xs my-auto animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-slate-100 text-xs my-auto animate-fadeIn max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-2.5">
               <h3 className="font-bold text-slate-900 text-sm">
                 {isEditing ? "✏️ แก้ไขข้อมูลพนักงาน" : "➕ เพิ่มพนักงานใหม่"}
@@ -341,15 +356,36 @@ export default function SupervisorEmployeesPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">อัตราค่าจ้างต่อวัน (บาท):</label>
-                <input
-                  type="number"
-                  value={dailyRate}
-                  onChange={(e) => setDailyRate(e.target.value)}
-                  placeholder="เช่น 520"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-amber-500 font-mono"
-                />
+              {/* ส่วนแยกกรอก ค่าจ้างปกติ 8 ชม. และ OT 4 ชม. */}
+              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 mb-1">ค่าจ้างปกติ (8 ชม.):</label>
+                  <input
+                    type="number"
+                    required
+                    value={baseWage8Hrs}
+                    onChange={(e) => setBaseWage8Hrs(e.target.value)}
+                    placeholder="400"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-amber-700 mb-1">ค่าล่วงเวลา (OT 4 ชม.):</label>
+                  <input
+                    type="number"
+                    required
+                    value={otWage4Hrs}
+                    onChange={(e) => setOtWage4Hrs(e.target.value)}
+                    placeholder="120"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                  />
+                </div>
+                <div className="col-span-2 pt-1 text-[10px] text-slate-500 flex justify-between border-t border-slate-200 mt-1 font-mono">
+                  <span>รวมเรตต่อวันสุทธิ:</span>
+                  <strong className="text-emerald-700 font-bold">
+                    ฿{(parseFloat(baseWage8Hrs || "0") + parseFloat(otWage4Hrs || "0")).toLocaleString()} / วัน
+                  </strong>
+                </div>
               </div>
 
               <div>
@@ -368,7 +404,6 @@ export default function SupervisorEmployeesPage() {
                 </select>
               </div>
 
-              {/* ปุ่มจัดการด้านล่าง */}
               {isEditing && (
                 <div className="pt-1">
                   <button

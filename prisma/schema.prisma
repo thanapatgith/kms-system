@@ -132,6 +132,9 @@ model User {
   equipmentRequests EquipmentRequest[]
   randomChecks   RandomCheck[]
   notifications  notifications[]
+  
+baseWage8Hrs   Float     @default(400) @map("base_wage_8hrs")
+otRate4Hrs     Float     @default(120) @map("ot_rate_4hrs")
 
   @@index([siteId])
   @@index([role])

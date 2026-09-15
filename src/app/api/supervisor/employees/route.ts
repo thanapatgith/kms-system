@@ -29,7 +29,7 @@ export async function GET(req: Request) {
     if (employeeCodes.length > 0) {
       const { data: payrolls } = await supabase
         .from("payrolls")
-        .select("employee_code, wage, overtime_pay")
+        .select("employee_code, wage, overtime_pay, daily_wage")
         .in("employee_code", employeeCodes);
 
       if (payrolls) {
@@ -47,10 +47,11 @@ export async function GET(req: Request) {
 
       const pData = emp.employeeCode ? payrollMap.get(emp.employeeCode.trim()) : null;
       if (pData) {
-        const dbWage = Number(pData.wage) || 400;
-        const dbOtPerHour = Number(pData.overtime_pay) || 30;
-        baseWage8Hrs = dbWage;
-        otRate4Hrs = dbOtPerHour * 4;
+        baseWage8Hrs = Number(pData.wage) || 400;
+        const rawOt = pData.overtime_pay !== null && pData.overtime_pay !== undefined ? Number(pData.overtime_pay) : 30;
+        
+        // แปลงเรตต่อชั่วโมงใน DB กลับเป็นยอดเต็ม 4 ชม. (เช่น 37.5 * 4 = 150)
+        otRate4Hrs = rawOt < 60 ? rawOt * 4 : rawOt;
       }
 
       const totalDailyRate = baseWage8Hrs + otRate4Hrs;
@@ -78,7 +79,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { name, employeeCode, phone, dailyRate, siteId } = body;
+    const { name, employeeCode, phone, baseWage8Hrs, otWage4Hrs, siteId } = body;
 
     if (!name || !employeeCode) {
       return NextResponse.json({ ok: false, error: "กรุณากรอกชื่อและรหัสพนักงาน" }, { status: 400 });
@@ -98,19 +99,6 @@ export async function POST(req: Request) {
       },
     });
 
-    if (dailyRate) {
-      const totalDaily = parseFloat(dailyRate);
-      const baseWage8Hrs = 400;
-      const diffOtTotal = Math.max(0, totalDaily - baseWage8Hrs);
-      const otPerHour = diffOtTotal > 0 ? diffOtTotal / 4 : 30;
-
-      await supabase.from("payrolls").upsert({
-        employee_code: employeeCode.trim(),
-        wage: baseWage8Hrs,
-        overtime_pay: otPerHour,
-      }, { onConflict: "employee_code" });
-    }
-
     return NextResponse.json({ ok: true, message: "เพิ่มพนักงานสำเร็จ", data: newEmployee });
   } catch (error: any) {
     console.error("Create employee error:", error);
@@ -126,7 +114,7 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
-    const { id, name, phone, dailyRate, siteId } = body;
+    const { id, name, phone, baseWage8Hrs, otWage4Hrs, siteId } = body;
 
     if (!id) {
       return NextResponse.json({ ok: false, error: "ไม่พบรหัสพนักงาน" }, { status: 400 });
@@ -143,17 +131,22 @@ export async function PUT(req: Request) {
       },
     });
 
-    if (dailyRate !== undefined && dailyRate !== "" && targetUser?.employeeCode) {
-      const totalDaily = parseFloat(dailyRate);
-      const baseWage8Hrs = 400;
-      const diffOtTotal = Math.max(0, totalDaily - baseWage8Hrs);
-      const otPerHour = diffOtTotal > 0 ? diffOtTotal / 4 : 30;
+    // ⭐ แก้ไขให้ตรวจสอบและรองรับการกรอกเลข 0 ได้อย่างถูกต้อง (ไม่ตกหลุมพราง Falsy check)
+    if (baseWage8Hrs !== undefined && otWage4Hrs !== undefined && targetUser?.employeeCode) {
+      const parsedBase = parseFloat(baseWage8Hrs);
+      const parsedOtTotal = parseFloat(otWage4Hrs);
 
-      await supabase.from("payrolls").upsert({
-        employee_code: targetUser.employeeCode.trim(),
-        wage: baseWage8Hrs,
-        overtime_pay: otPerHour,
-      }, { onConflict: "employee_code" });
+      const wageVal = !isNaN(parsedBase) ? parsedBase : 400;
+      const otTotalVal = !isNaN(parsedOtTotal) ? parsedOtTotal : 0; // รองรับค่า 0 ได้สมบูรณ์
+      const otPerHour = otTotalVal / 4; 
+
+      await supabase.from("payrolls")
+        .update({
+          wage: wageVal,
+          overtime_pay: otPerHour, 
+          daily_wage: wageVal + otTotalVal 
+        })
+        .eq("employee_code", targetUser.employeeCode.trim());
     }
 
     return NextResponse.json({ ok: true, message: "อัปเดตข้อมูลสำเร็จ", data: updated });
@@ -163,7 +156,6 @@ export async function PUT(req: Request) {
   }
 }
 
-// 4. รีเซ็ตรหัสผ่านพนักงานเป็นค่าเริ่มต้น (PATCH)
 export async function PATCH(req: Request) {
   try {
     const session = await getSession();

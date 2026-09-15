@@ -23,7 +23,6 @@ export default function SalarySummaryCard({
   roleBadgeBg = "bg-orange-500",
   roleBadgeText = "text-white",
 }: SalarySummaryCardProps) {
-  // แสดงชื่อไซต์ตามที่ส่งมา ถ้าไม่มีจริงๆ ถึงแสดงสำนักงานใหญ่
   const displaySite = (!siteName || siteName === "ยังไม่ระบุหน่วยงาน") 
     ? "สำนักงานใหญ่" 
     : siteName;
@@ -65,7 +64,7 @@ export default function SalarySummaryCard({
           <div className="bg-slate-900/90 py-3 px-2 rounded-2xl border border-slate-800 shadow-sm flex flex-col justify-between">
             <div>
               <span className="block text-xs font-sans text-slate-300 font-bold">ทำแล้ว</span>
-              <span className="block text-[10px] font-sans text-slate-400 font-normal">(นับจาก 1)</span>
+              <span className="block text-[10px] font-sans text-amber-400 font-normal">(รอบปัจจุบัน)</span>
             </div>
             <span className="font-extrabold text-slate-100 text-base mt-2">{workedDays} วัน</span>
           </div>
