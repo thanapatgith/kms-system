@@ -33,7 +33,6 @@ export async function GET(req: Request) {
     const siteId = user.site_id || user.siteId;
     if (siteId) {
       try {
-        // ค้นหาผ่าน Prisma ตาราง sites (รองรับทั้ง PascalCase และ lowercase ตาม schema)
         const siteData = await (prisma as any).site?.findUnique({
           where: { id: String(siteId) },
           select: { siteName: true },
@@ -45,7 +44,6 @@ export async function GET(req: Request) {
         if (siteData) {
           branchName = siteData.siteName || siteData.site_name || "ยังไม่ระบุหน่วยงาน";
         } else {
-          // Fallback ใช้ query ตรงถ้าโมเดล Prisma ไม่แมตช์
           const rawSite: any = await prisma.$queryRaw`SELECT site_name FROM sites WHERE id::text = ${String(siteId)} LIMIT 1`;
           if (rawSite && rawSite.length > 0 && rawSite[0].site_name) {
             branchName = rawSite[0].site_name;
@@ -56,13 +54,11 @@ export async function GET(req: Request) {
       }
     }
 
+    // ปรับให้คิดรอบวันทำงานตั้งแต่วันที่ 1 ของเดือนปัจจุบัน
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
-    let startDate = new Date(year, month, 11);
-    if (now.getDate() < 11) {
-      startDate = new Date(year, month - 1, 11);
-    }
+    const startDate = new Date(year, month, 1);
     startDate.setHours(0, 0, 0, 0);
 
     let workedDays = Math.max(0, Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);

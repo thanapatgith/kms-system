@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import EmployeeBottomNav from "@/components/EmployeeBottomNav";
 
-// ฟังก์ชันช่วยแปลงงวดประจำเดือนให้แสดงผลเข้าใจง่าย (เช่น 1 - 31 กรกฎาคม 2569 / จ่าย 10 สิงหาคม 2569)
+// ฟังก์ชันแปลงงวดประจำเดือน: รอบทำงานวันที่ 1 - สิ้นเดือน / จ่ายวันที่ 10 ของเดือนถัดไป
 const formatBillingPeriod = (periodStr: string) => {
   if (!periodStr) return { workPeriod: "-", payDate: "-" };
   
@@ -304,25 +305,8 @@ export default function EmployeePayrollsPage() {
         );
       })()}
 
-      {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-2 py-2 flex justify-around items-center z-50 shadow-lg">
-        <Link href="/employee/profile" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
-          <span className="text-base mb-0.5">👤</span>
-          หน้าแรก
-        </Link>
-        <Link href="/employee/attendance" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
-          <span className="text-base mb-0.5">⏱️</span>
-          ลงเวลาทำงาน
-        </Link>
-        <Link href="/employee/reports" className="flex flex-col items-center text-slate-400 hover:text-orange-400 text-[10px] font-semibold transition">
-          <span className="text-base mb-0.5">🛡️</span>
-          รายงาน
-        </Link>
-        <Link href="/employee/payrolls" className="flex flex-col items-center text-orange-400 text-[10px] font-semibold transition">
-          <span className="text-base mb-0.5">💵</span>
-          เงินเดือน
-        </Link>
-      </nav>
+      {/* เรียกใช้งาน Component Bottom Navigation ที่แยกออกมา */}
+      <EmployeeBottomNav />
     </div>
   );
 }

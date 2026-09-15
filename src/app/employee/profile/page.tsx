@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import SalarySummaryCard from "@/components/SalarySummaryCard";
+import EmployeeBottomNav from "@/components/EmployeeBottomNav";
 
 export default function EmployeeProfilePage() {
   const router = useRouter();
@@ -269,7 +270,7 @@ export default function EmployeeProfilePage() {
               {notifications.length === 0 ? (
                 <div className="text-center py-10 text-slate-400 font-medium">ไม่มีการแจ้งเตือนใหม่</div>
               ) : (
-                notifications.map((item) => (
+                (notifications as any[]).map((item) => (
                   <div 
                     key={item.id} 
                     onClick={() => !item.is_read && markAsRead(item.id)}
@@ -300,25 +301,8 @@ export default function EmployeeProfilePage() {
         </div>
       )}
 
-      {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-slate-950 border-t-2 border-slate-800 px-3 py-3 flex justify-around items-center z-50 shadow-2xl">
-        <Link href="/employee/profile" className="flex flex-col items-center text-orange-400 text-xs font-black transition scale-105">
-          <span className="text-2xl mb-1">👤</span>
-          หน้าแรก
-        </Link>
-        <Link href="/employee/attendance" className="flex flex-col items-center text-slate-200 hover:text-orange-400 text-xs font-extrabold transition">
-          <span className="text-2xl mb-1">⏱️</span>
-          ลงเวลาทำงาน
-        </Link>
-        <Link href="/employee/reports" className="flex flex-col items-center text-slate-200 hover:text-orange-400 text-xs font-extrabold transition">
-          <span className="text-2xl mb-1">🛡️</span>
-          รายงาน
-        </Link>
-        <Link href="/employee/payrolls" className="flex flex-col items-center text-slate-200 hover:text-orange-400 text-xs font-extrabold transition">
-          <span className="text-2xl mb-1">💵</span>
-          เงินเดือน
-        </Link>
-      </nav>
+      {/* เรียกใช้งาน Component Bottom Navigation ที่แยกออกมา */}
+      <EmployeeBottomNav />
     </div>
   );
 }

@@ -28,31 +28,35 @@ export async function GET() {
 
     const dailyWage = payroll?.daily_wage || 520;
     
-    const rawWorkDays = Number(payroll?.work_days) || 31;
-    const workedDays = rawWorkDays > 20 ? 20 : rawWorkDays; 
-
-    const grossIncome = dailyWage * workedDays;
-    const maxCredit = Math.floor(grossIncome * 0.85);
-
-    const netSalary = Number(payroll?.net_salary) || grossIncome;
-    const totalDeductions = Number(payroll?.total_deductions) || 0;
-
     const now = new Date();
     const currentDay = now.getDate();
     
     let targetRound = 20;
     let isWindowOpen = false;
 
-    if (currentDay >= 1 && currentDay <= 17) {
+    // กำหนดรอบและเช็คช่วงวันเปิดให้ยื่นเรื่อง
+    if (currentDay >= 11 && currentDay <= 20) {
       targetRound = 20;
-      isWindowOpen = true;
-    } else if (currentDay >= 18 && currentDay <= 30) {
-      targetRound = 30;
-      isWindowOpen = true;
+      isWindowOpen = (currentDay >= 11 && currentDay <= 17);
     } else {
-      targetRound = (currentDay > 30 || currentDay <= 10) ? 20 : 30;
-      isWindowOpen = false;
+      targetRound = 30; // รอบสิ้นเดือน
+      isWindowOpen = (currentDay >= 21 && currentDay <= 27);
     }
+
+    // ⭐ แก้ไขตรงนี้: หากเป็นรอบวันที่ 20 ให้คิดจาก 10 วัน, ถ้ารอบสิ้นเดือนให้คิดจาก 20 หรือ work_days เต็ม
+    const rawWorkDays = Number(payroll?.work_days) || 30;
+    let workedDays = rawWorkDays;
+    if (targetRound === 20) {
+      workedDays = 10; // รอบวันที่ 20 คิดจากวันทำงาน 10 วัน (ช่วง 11-20)
+    } else {
+      workedDays = rawWorkDays > 20 ? rawWorkDays : 20; // รอบสิ้นเดือนคิดตามสัดส่วน
+    }
+
+    const grossIncome = dailyWage * workedDays;
+    const maxCredit = Math.floor(grossIncome * 0.85);
+
+    const netSalary = Number(payroll?.net_salary) || grossIncome;
+    const totalDeductions = Number(payroll?.total_deductions) || 0;
 
     // 3. ดึงประวัติการกู้และคำนวณยอดสะสมจากฟิลด์ amount
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
@@ -112,7 +116,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "กรุณาระบุจำนวนเงินให้ถูกต้อง" }, { status: 400 });
     }
 
-    // บันทึกลงตาราง loan_requests เฉพาะฟิลด์ที่มีในฐานข้อมูล
     const { error: insertError } = await supabase
       .from("loan_requests")
       .insert([
