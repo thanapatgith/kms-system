@@ -4,10 +4,20 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import EmployeeBottomNav from "@/components/EmployeeBottomNav";
 
+// ฟังก์ชัน fetch ดักจับ 401 เพื่อดีดกลับหน้า login อัตโนมัติ
+async function fetchWithAuth(url: string, options?: RequestInit) {
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    window.location.href = "/login";
+    throw new Error("Session expired");
+  }
+  return res;
+}
+
 export default function EmployeeAttendancePage() {
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
-  const [isWorking, setIsWorking] = useState(false); // ควบคุมสถานะกำลังทำงานโดยตรงจาก API
+  const [isWorking, setIsWorking] = useState(false); 
   const [message, setMessage] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [location, setLocation] = useState<{ lat: number | null; lng: number | null }>({ lat: null, lng: null });
@@ -50,17 +60,15 @@ export default function EmployeeAttendancePage() {
 
   const fetchAttendance = async () => {
     try {
-      const res = await fetch("/api/employee/attendance", {
+      const res = await fetchWithAuth("/api/employee/attendance", {
         cache: "no-store",
       });
       const data = await res.json();
       if (data.ok) {
         setHistory(data.attendance || []);
-        // ตรวจสอบสถานะ isWorking จาก API โดยตรง (ถ้ามีกะล่าสุดที่ยังไม่เช็คเอาท์)
         if (typeof data.isWorking === "boolean") {
           setIsWorking(data.isWorking);
         } else {
-          // Fallback เผื่อ API เก่า เช็คจากรายการล่าสุดของวันนี้
           const todayStr = new Date().toISOString().split("T")[0];
           const todayRecords = (data.attendance || []).filter((item: any) => {
             if (!item.rawDate) return false;
@@ -77,7 +85,7 @@ export default function EmployeeAttendancePage() {
 
   const fetchSites = async () => {
     try {
-      const res = await fetch("/api/employee/attendance?action=sites", { cache: "no-store" });
+      const res = await fetchWithAuth("/api/employee/attendance?action=sites", { cache: "no-store" });
       const data = await res.json();
       
       const siteList = data.sites || data.branches;
@@ -203,7 +211,7 @@ export default function EmployeeAttendancePage() {
       formData.append("longitude", location.lng.toString());
       formData.append("images", selectedImage);
 
-      const res = await fetch("/api/employee/attendance", {
+      const res = await fetchWithAuth("/api/employee/attendance", {
         method: "POST",
         body: formData,
       });
@@ -219,7 +227,9 @@ export default function EmployeeAttendancePage() {
       setPreviewUrl(null);
       fetchAttendance();
     } catch (err: any) {
-      setErrorMsg(err.message || "เกิดข้อผิดพลาด");
+      if (err.message !== "Session expired") {
+        setErrorMsg(err.message || "เกิดข้อผิดพลาด");
+      }
     } finally {
       setLoading(false);
     }
@@ -444,7 +454,6 @@ export default function EmployeeAttendancePage() {
         </div>
       </div>
 
-      {/* เรียกใช้งาน Component Bottom Navigation ที่แยกออกมา */}
       <EmployeeBottomNav />
     </div>
   );

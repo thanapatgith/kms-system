@@ -117,7 +117,6 @@ export default function CEOApprovalsPage() {
     fetchApprovals();
   }, []);
 
-  // กดอนุมัติทันทีโดยไม่ต้องบังคับใส่สลิปก่อน
   const handleApprove = async (item: RequestItem) => {
     try {
       const res = await fetch("/api/ceo/approvals", {
@@ -132,7 +131,6 @@ export default function CEOApprovalsPage() {
     }
   };
 
-  // บันทึกสลิปโอนเงิน (ใช้ได้ทั้งตอนที่อนุมัติแล้วหรือกำลังจะแนบเพิ่ม)
   const handleConfirmTransfer = async () => {
     if (!transferringItem) return;
     try {
@@ -142,7 +140,7 @@ export default function CEOApprovalsPage() {
         body: JSON.stringify({
           id: transferringItem.id,
           type: transferringItem.type,
-          status: "APPROVED", // คงสถานะอนุมัติไว้
+          status: "APPROVED",
           slip_url: slipUrlInput.trim(),
         }),
       });
@@ -224,6 +222,46 @@ export default function CEOApprovalsPage() {
     .filter(i => i.type === "loan")
     .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
+  // ฟังก์ชันดาวน์โหลด Excel (CSV)
+  const handleExportExcel = () => {
+    if (filteredRequests.length === 0) {
+      alert("ไม่พบข้อมูลสำหรับ Export ตามเงื่อนไขนี้");
+      return;
+    }
+
+    let csvContent = "\uFEFF"; // BOM สำหรับรองรับภาษาไทยใน Excel
+    csvContent += "ลำดับ,รหัสพนักงาน,ชื่อพนักงาน,หน่วยงาน,ประเภทคำร้อง,สถานะ,ยอดเงิน (บาท),ธนาคาร,เลขบัญชี,เหตุผล,วันที่ยื่น\n";
+
+    filteredRequests.forEach((item, index) => {
+      const typeText = item.type === "loan" ? "เงินล่วงหน้า" : item.type === "leave" ? "ขอลาหยุด" : "เบิกอุปกรณ์";
+      const statusText = (item.status || "PENDING").toUpperCase() === "APPROVED" ? "อนุมัติแล้ว" : (item.status || "PENDING").toUpperCase() === "REJECTED" ? "ปฏิเสธแล้ว" : "รออนุมัติ";
+      const amount = item.amount ? item.amount : 0;
+      const row = [
+        index + 1,
+        `"${item.employee_code || item.user_id || "-"}"`,
+        `"${item.employee_name || item.applicant_name || "-"}"`,
+        `"${item.site_name || "สำนักงานใหญ่"}"`,
+        `"${typeText}"`,
+        `"${statusText}"`,
+        amount,
+        `"${item.bank_name || "-"}"`,
+        `"${item.bank_account || "-"}"`,
+        `"${(item.reason || "-").replace(/"/g, '""')}"`,
+        `"${formatThaiDateTime(item.created_at)}"`
+      ];
+      csvContent += row.join(",") + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `CEO_Approvals_${selectedMonth}_${activeTab}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="w-full min-h-screen bg-slate-100 pb-24 font-sans flex flex-col">
       {/* Header */}
@@ -236,17 +274,26 @@ export default function CEOApprovalsPage() {
             <h1 className="text-sm font-bold">รายการอนุมัติคำร้อง</h1>
           </div>
 
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="bg-slate-800 text-amber-300 border border-slate-700 text-[11px] font-bold rounded-lg px-2.5 py-1 focus:outline-none cursor-pointer"
-          >
-            {monthOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label} {opt.value === getCurrentPeriod() ? "(เดือนปัจจุบัน)" : ""}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportExcel}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition shadow-sm flex items-center gap-1 cursor-pointer"
+            >
+              <span>📊 ออก Excel</span>
+            </button>
+
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-slate-800 text-amber-300 border border-slate-700 text-[11px] font-bold rounded-lg px-2 py-1 focus:outline-none cursor-pointer"
+            >
+              {monthOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label} {opt.value === getCurrentPeriod() ? "(เดือนปัจจุบัน)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </header>
 
@@ -490,7 +537,7 @@ export default function CEOApprovalsPage() {
                               </span>
                             )}
 
-                            {/* ปุ่มเพิ่ม/แก้ไขสลิป (แสดงเฉพาะตอนที่อนุมัติแล้ว และเป็นประเภท loan) */}
+                            {/* ปุ่มเพิ่ม/แก้ไขสลิป */}
                             {isApproved && (
                               <button
                                 onClick={() => {

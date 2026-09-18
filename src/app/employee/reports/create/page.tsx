@@ -4,6 +4,16 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+// ฟังก์ชัน fetch ดักจับ 401 เพื่อดีดกลับหน้า login อัตโนมัติ
+async function fetchWithAuth(url: string, options?: RequestInit) {
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    window.location.href = "/login";
+    throw new Error("Session expired");
+  }
+  return res;
+}
+
 export default function CreateReportPage() {
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -48,7 +58,7 @@ export default function CreateReportPage() {
 
   const fetchUserProfile = async () => {
     try {
-      const res = await fetch("/api/employee/reports?action=sites");
+      const res = await fetchWithAuth("/api/employee/reports?action=sites");
       const data = await res.json();
       if (data.ok && data.branches) {
         setBranchesList(data.branches);
@@ -237,7 +247,7 @@ export default function CreateReportPage() {
       }
       images.forEach((img) => formData.append("images", img));
 
-      const res = await fetch("/api/employee/reports", {
+      const res = await fetchWithAuth("/api/employee/reports", {
         method: "POST",
         body: formData,
       });
@@ -249,7 +259,9 @@ export default function CreateReportPage() {
 
       setShowSuccessModal(true);
     } catch (err: any) {
-      setErrorMsg(err.message || "เกิดข้อผิดพลาดในการส่งข้อมูล");
+      if (err.message !== "Session expired") {
+        setErrorMsg(err.message || "เกิดข้อผิดพลาดในการส่งข้อมูล");
+      }
     } finally {
       setLoading(false);
     }
