@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { uploadAttendanceImage } from "@/lib/supabaseStorage";
+import sharp from "sharp"; // ⭐ นำเข้า sharp สำหรับบีบอัดภาพลงเวลา
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -32,7 +33,6 @@ export async function GET(req: Request) {
       const day = String(thaiNow.getDate()).padStart(2, '0');
       const todayStr = `${year}-${month}-${day}`;
 
-      // ตรวจสอบกะปฏิบัติหน้าที่แทน (รองรับกรณี end_date เป็น NULL)
       try {
         const replacements: any = await prisma.$queryRaw`
           SELECT site_id 
@@ -110,7 +110,7 @@ export async function GET(req: Request) {
           locationIn: latLngStr,
           locationOut: "-",
           imagesIn: item.images || [], 
-          imagesOut: [],              
+          imagesOut: [],               
           status: "ปกติ",
         });
       } else if (item.type === "CHECK_OUT") {
@@ -133,7 +133,6 @@ export async function GET(req: Request) {
     });
     allFormatted.reverse();
 
-    // ตรวจสอบสถานะการทำงานจากเรกคอร์ดล่าสุดทั้งหมด (แม่นยำที่สุด)
     const lastRecord = attendances[attendances.length - 1];
     const isCurrentlyWorking = lastRecord ? lastRecord.type === "CHECK_IN" : false;
 
@@ -143,7 +142,8 @@ export async function GET(req: Request) {
       isWorking: isCurrentlyWorking 
     }, {
       headers: {
-        'Cache-Control': 'no-store, max-age=0',
+        // ⭐ เพิ่ม Cache ชั่วคราว 30 วินาที เพื่อช่วยลดการยิงซ้ำๆ และลด Cached Egress
+        'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
       },
     });
   } catch (error: any) {
@@ -152,7 +152,7 @@ export async function GET(req: Request) {
   }
 }
 
-// 2. บันทึกเช็คอิน / เช็คเอาท์ พร้อมพิกัดและ siteId (POST)
+// 2. บันทึกเช็คอิน / เช็คเอาท์ พร้อมบีบอัดรูปภาพก่อนอัปขึ้น Supabase (POST)
 export async function POST(req: Request) {
   try {
     const session = await getSession();
@@ -162,7 +162,7 @@ export async function POST(req: Request) {
 
     const formData = await req.formData();
     const type = formData.get("type") as string;
-    const branchName = formData.get("branch") as string; // รับค่าชื่อสาขาจากหน้าบ้าน
+    const branchName = formData.get("branch") as string;
     const latitude = formData.get("latitude");
     const longitude = formData.get("longitude");
     const imageFiles = formData.getAll("images") as File[];
@@ -175,7 +175,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "กรุณาแนบรูปภาพอย่างน้อย 1 รูป" }, { status: 400 });
     }
 
-    // แปลงชื่อสาขา (branch) ให้เป็น site_id (UUID)
     let siteUuid: string | null = null;
     if (branchName) {
       const foundSite: any = await prisma.$queryRaw`
@@ -188,7 +187,6 @@ export async function POST(req: Request) {
 
     const thaiNow = getThaiCurrentDate();
 
-    // ตรวจสอบสถานะกะล่าสุดจากประวัติทั้งหมดของ user
     const allRecords = await prisma.attendance.findMany({
       where: { userId: session.userId },
       orderBy: { createdAt: "asc" },
@@ -208,14 +206,21 @@ export async function POST(req: Request) {
     for (const file of imageFiles) {
       if (file && typeof file.arrayBuffer === "function") {
         const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
+        const originalBuffer = Buffer.from(bytes);
         
-        const publicUrl = await uploadAttendanceImage(buffer, file.name || "attendance.jpg");
+        // ⭐ บีบอัดและย่อขนาดรูปถ่ายลงเวลาด้วย Sharp
+        // - จำกัดความกว้างสูงสุดไม่เกิน 1200px
+        // - แปลงเป็น JPEG และปรับคุณภาพ (Quality) เหลือ 80%
+        const compressedBuffer = await sharp(originalBuffer)
+          .resize({ width: 1200, withoutEnlargement: true })
+          .jpeg({ quality: 80, progressive: true })
+          .toBuffer();
+
+        const publicUrl = await uploadAttendanceImage(compressedBuffer, (file.name || "attendance").replace(/\.[^/.]+$/, "") + ".jpg");
         imageUrls.push(publicUrl);
       }
     }
 
-    // บันทึกลงฐานข้อมูล (ใช้ siteId ตาม schema ที่ประกาศไว้)
     const newAttendance = await prisma.attendance.create({
       data: {
         userId: session.userId,

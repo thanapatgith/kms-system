@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import sharp from "sharp"; // ⭐ นำเข้า sharp สำหรับบีบอัดภาพ
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -45,8 +46,8 @@ export async function GET(req: Request) {
           checkOut: "-",
           locationIn: latLngStr,
           locationOut: "-",
-          imagesIn: item.images || [], // <--- เปลี่ยนจาก images เป็น imagesIn
-          imagesOut: [],              // <--- เพิ่ม imagesOut เป็น array ว่าง
+          imagesIn: item.images || [], 
+          imagesOut: [],              
           status: "ปกติ",
         });
       } else if (item.type === "CHECK_OUT") {
@@ -54,7 +55,7 @@ export async function GET(req: Request) {
         if (activeShift) {
           activeShift.checkOut = timeStr;
           activeShift.locationOut = latLngStr;
-          activeShift.imagesOut = item.images || []; // <--- เก็บรูปที่นี่
+          activeShift.imagesOut = item.images || []; 
         } else if (dayList.length > 0) {
           dayList[dayList.length - 1].checkOut = timeStr;
           dayList[dayList.length - 1].locationOut = latLngStr;
@@ -69,14 +70,19 @@ export async function GET(req: Request) {
     });
     allFormatted.reverse();
 
-    return NextResponse.json({ ok: true, attendance: allFormatted });
+    return NextResponse.json({ ok: true, attendance: allFormatted }, {
+      headers: {
+        // ⭐ เพิ่ม Cache ชั่วคราว 30 วินาที เพื่อช่วยลดการยิงซ้ำๆ
+        'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+      },
+    });
   } catch (error: any) {
     console.error("Get attendance error:", error);
     return NextResponse.json({ ok: false, error: error.message || "เกิดข้อผิดพลาด" }, { status: 500 });
   }
 }
 
-// 2. บันทึกเช็คอิน / เช็คเอาท์ พร้อมพิกัดและอัปโหลดรูปภาพ (POST)
+// 2. บันทึกเช็คอิน / เช็คเอาท์ พร้อมบีบอัดรูปภาพด้วย Sharp ก่อนบันทึกไฟล์ (POST)
 export async function POST(req: Request) {
   try {
     const session = await getSession();
@@ -98,7 +104,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "กรุณาแนบรูปภาพอย่างน้อย 1 รูป" }, { status: 400 });
     }
 
-    // ตรวจสอบสถานะกะปัจจุบัน
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
@@ -120,8 +125,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "คุณยังไม่ได้เช็คอินเข้างาน ไม่สามารถเช็คเอาท์ได้" }, { status: 400 });
     }
 
-    // จัดการอัปโหลดไฟล์รูปภาพเก็บไว้ในโฟลเดอร์ public/uploads/attendance
-    const imageUrls: string[] = [];
     const uploadDir = path.join(process.cwd(), "public", "uploads", "attendance");
     
     try {
@@ -130,21 +133,28 @@ export async function POST(req: Request) {
       // ignore if exists
     }
 
+    const imageUrls: string[] = [];
+
     for (const file of imageFiles) {
       if (file && typeof file.arrayBuffer === "function") {
         const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
+        const originalBuffer = Buffer.from(bytes);
         
+        // ⭐ บีบอัดและย่อขนาดรูปภาพด้วย Sharp (จำกัดความกว้าง 1200px, คุณภาพ 80%)
+        const compressedBuffer = await sharp(originalBuffer)
+          .resize({ width: 1200, withoutEnlargement: true })
+          .jpeg({ quality: 80, progressive: true })
+          .toBuffer();
+
         const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-        const filename = `${session.userId}-${uniqueSuffix}${path.extname(file.name || ".jpg")}`;
+        const filename = `${session.userId}-${uniqueSuffix}.jpg`;
         const filepath = path.join(uploadDir, filename);
 
-        await writeFile(filepath, buffer);
+        await writeFile(filepath, compressedBuffer);
         imageUrls.push(`/uploads/attendance/${filename}`);
       }
     }
 
-    // บันทึกลงฐานข้อมูล
     const newAttendance = await prisma.attendance.create({
       data: {
         userId: session.userId,

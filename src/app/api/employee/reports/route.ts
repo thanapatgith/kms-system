@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { uploadReportImage } from "@/lib/supabaseStorage";
+import sharp from "sharp"; // ⭐ นำเข้า sharp สำหรับบีบอัดภาพ
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -17,7 +18,6 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const action = searchParams.get("action");
 
-    // ถ้า Request ขอรายชื่อหน่วยงาน ให้ดึงเฉพาะ site ของพนักงานคนนี้เท่านั้น
     if (action === "sites") {
       const userList = (await prisma.$queryRaw`
         SELECT site_id FROM users WHERE id = ${session.userId} LIMIT 1
@@ -39,7 +39,6 @@ export async function GET(req: Request) {
         }
       }
 
-      // ถ้าพนักงานคนนี้ยังไม่ได้ผูก site_id ให้ใช้ค่าเริ่มต้น
       if (branchesList.length === 0) {
         branchesList = ["หน่วยงานทั่วไป"];
       }
@@ -51,7 +50,6 @@ export async function GET(req: Request) {
       });
     }
 
-    // กรณีปกติ: ดึงประวัติรายงาน
     const reports = (await prisma.$queryRaw`
       SELECT r.*, s.site_name 
       FROM incident_reports r
@@ -88,7 +86,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, reports: formatted }, {
       headers: {
-        'Cache-Control': 'no-store, max-age=0',
+        // ⭐ เพิ่ม Cache ชั่วคราว 30 วินาที เพื่อลดภาระการยิงซ้ำๆ และลด Cached Egress
+        'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
       },
     });
   } catch (error: any) {
@@ -97,7 +96,7 @@ export async function GET(req: Request) {
   }
 }
 
-// 2. สร้างและส่งรายงานเหตุการณ์ใหม่ พร้อมพิกัด, ชื่อหน่วยงาน และอัปโหลดรูปภาพ (POST)
+// 2. สร้างและส่งรายงานเหตุการณ์ใหม่ พร้อมบีบอัดรูปภาพก่อนอัปขึ้น Supabase (POST)
 export async function POST(req: Request) {
   try {
     const session = await getSession();
@@ -131,9 +130,17 @@ export async function POST(req: Request) {
       for (const file of imageFiles) {
         if (file && typeof file.arrayBuffer === "function") {
           const bytes = await file.arrayBuffer();
-          const buffer = Buffer.from(bytes);
+          const originalBuffer = Buffer.from(bytes);
+
+          // ⭐ บีบอัดและย่อขนาดภาพด้วย Sharp ก่อนอัปโหลด
+          // - ย่อความกว้างสูงสุดไม่เกิน 1200px (คงสัดส่วน)
+          // - แปลงเป็น JPEG และปรับ Quality เหลือ 80% (ลดขนาดไฟล์จากเดิมได้ถึง 70-80%)
+          const compressedBuffer = await sharp(originalBuffer)
+            .resize({ width: 1200, withoutEnlargement: true })
+            .jpeg({ quality: 80, progressive: true })
+            .toBuffer();
           
-          const publicUrl = await uploadReportImage(buffer, file.name || "report.jpg");
+          const publicUrl = await uploadReportImage(compressedBuffer, (file.name || "report").replace(/\.[^/.]+$/, "") + ".jpg");
           imageUrls.push(publicUrl);
         }
       }

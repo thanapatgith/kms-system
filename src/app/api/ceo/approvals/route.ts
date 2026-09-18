@@ -11,8 +11,10 @@ const supabaseAdmin = createClient(
 
 export async function GET() {
   try {
-    // 1. ดึงรายชื่อพนักงานทั้งหมด (รวม site_id) จาก users
-    const { data: usersData } = await supabaseAdmin.from("users").select("id, name, employee_code, site_id");
+    // 1. ดึงรายชื่อพนักงานเฉพาะฟิลด์ที่จำเป็นเพื่อลดขนาดข้อมูล (Payload)
+    const { data: usersData } = await supabaseAdmin
+      .from("users")
+      .select("id, name, employee_code, site_id, bank_name, bank_account");
     
     // 2. ดึงรายชื่อหน่วยงานทั้งหมดจาก sites มาทำ Map
     const { data: sitesData } = await supabaseAdmin.from("sites").select("id, site_name");
@@ -21,8 +23,8 @@ export async function GET() {
       if (s.id) siteMap.set(s.id, s.site_name);
     });
 
-    // สร้าง Map เก็บข้อมูลพนักงาน (ชื่อ, รหัส, ชื่อหน่วยงาน)
-    const userMap = new Map<string, { name: string; employee_code: string; site_name: string }>();
+    // สร้าง Map เก็บข้อมูลพนักงาน
+    const userMap = new Map<string, { name: string; employee_code: string; site_name: string; bank_name: string; bank_account: string }>();
     (usersData || []).forEach((u: any) => {
       if (u.id) {
         const siteName = u.site_id ? siteMap.get(u.site_id) || "สำนักงานใหญ่" : "สำนักงานใหญ่";
@@ -30,6 +32,8 @@ export async function GET() {
           name: u.name || "ไม่ระบุชื่อ",
           employee_code: u.employee_code || "KMS-EMP",
           site_name: siteName,
+          bank_name: u.bank_name || "-",
+          bank_account: u.bank_account || "-",
         });
       }
     });
@@ -52,7 +56,6 @@ export async function GET() {
       .select("*")
       .order("created_at", { ascending: false });
 
-    // ฟังก์ชันช่วยแมปข้อมูลพนักงานและหน่วยงาน
     const mapUserData = (list: any[]) =>
       (list || []).map((item) => {
         const uid = item.user_id || item.employee_id || item.applicant_id;
@@ -63,6 +66,8 @@ export async function GET() {
           employee_name: userInfo?.name || item.employee_name || item.applicant_name || "พนักงาน",
           employee_code: userInfo?.employee_code || item.employee_code || "KMS-EMP",
           site_name: userInfo?.site_name || item.site_name || "สำนักงานใหญ่",
+          bank_name: userInfo?.bank_name || item.bank_name || "-",
+          bank_account: userInfo?.bank_account || item.bank_account || "-",
         };
       });
 
@@ -75,7 +80,9 @@ export async function GET() {
       },
       {
         headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate",
+          // ⭐ ปรับ Cache-Control ให้เบราว์เซอร์จำข้อมูลชั่วคราว (30 วินาที) 
+          // ช่วยลดจำนวนครั้งที่ยิงมาที่เซิร์ฟเวอร์และช่วยลดการสะสม Egress ที่ไม่จำเป็น
+          "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
         },
       }
     );
@@ -90,7 +97,7 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { id, type, status, reject_reason } = body;
+    const { id, type, status, reject_reason, slip_url } = body;
 
     let tableName = "loan_requests";
     if (type === "leave") tableName = "leave_requests";
@@ -103,6 +110,10 @@ export async function PATCH(request: Request) {
 
     if (reject_reason) {
       updateData.reject_reason = reject_reason;
+    }
+
+    if (slip_url !== undefined) {
+      updateData.slip_url = slip_url;
     }
 
     const { error } = await supabaseAdmin

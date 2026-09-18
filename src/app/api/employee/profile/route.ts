@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import sharp from "sharp"; // ⭐ นำเข้า sharp สำหรับบีบอัดรูปโปรไฟล์
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -29,7 +30,6 @@ export async function GET(req: Request) {
     let otRate4Hrs = 120; 
     let branchName = "ยังไม่ระบุหน่วยงาน";
 
-    // ดึงชื่อไซต์จากตาราง sites โดยใช้ Prisma Model หรือ query พื้นฐานที่ปลอดภัย
     const siteId = user.site_id || user.siteId;
     if (siteId) {
       try {
@@ -54,7 +54,6 @@ export async function GET(req: Request) {
       }
     }
 
-    // ปรับให้คิดรอบวันทำงานตั้งแต่วันที่ 1 ของเดือนปัจจุบัน
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
@@ -119,6 +118,11 @@ export async function GET(req: Request) {
         totalDeductions: totalDeductions,
         image: userImage,
       },
+    }, {
+      headers: {
+        // ⭐ เพิ่ม Cache ชั่วคราว 30 วินาที เพื่อช่วยลดการยิง Request โปรไฟล์ซ้ำๆ
+        'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+      },
     });
   } catch (error: any) {
     console.error("Get profile error:", error);
@@ -171,12 +175,18 @@ export async function PUT(req: Request) {
 
     if (imageFile && typeof imageFile === "object" && typeof imageFile.size === "number" && imageFile.size > 0) {
       const bytes = await imageFile.arrayBuffer();
-      const buffer = Buffer.from(bytes);
+      const originalBuffer = Buffer.from(bytes);
       const fileName = `profile_${session.userId}_${Date.now()}.jpg`;
+
+      // ⭐ บีบอัดและย่อขนาดรูปโปรไฟล์ด้วย Sharp (จำกัดความกว้าง 600px พอดีสำหรับรูปโปรไฟล์)
+      const compressedBuffer = await sharp(originalBuffer)
+        .resize({ width: 600, withoutEnlargement: true })
+        .jpeg({ quality: 80, progressive: true })
+        .toBuffer();
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("attendance-images")
-        .upload(fileName, buffer, { contentType: imageFile.type || "image/jpeg", upsert: true });
+        .upload(fileName, compressedBuffer, { contentType: "image/jpeg", upsert: true });
 
       if (uploadError) {
         console.error("Storage upload error:", uploadError);

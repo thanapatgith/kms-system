@@ -43,7 +43,12 @@ export async function GET() {
       }),
     }));
 
-    return NextResponse.json({ ok: true, logs: formattedLogs });
+    return NextResponse.json({ ok: true, logs: formattedLogs }, {
+      headers: {
+        // ⭐ เพิ่ม Cache ชั่วคราว 30 วินาที เพื่อช่วยลดการยิง Request ซ้ำซ้อนและลด Egress
+        'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+      },
+    });
   } catch (error: any) {
     console.error("Fetch random check error:", error);
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
