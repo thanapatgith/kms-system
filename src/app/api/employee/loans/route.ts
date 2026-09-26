@@ -37,20 +37,14 @@ export async function GET() {
     // กำหนดรอบและเช็คช่วงวันเปิดให้ยื่นเรื่อง
     if (currentDay >= 11 && currentDay <= 20) {
       targetRound = 20;
-      isWindowOpen = (currentDay >= 11 && currentDay <= 17);
+      isWindowOpen = (currentDay >= 11 && currentDay <= 20);
     } else {
       targetRound = 30; // รอบสิ้นเดือน
       isWindowOpen = (currentDay >= 21 && currentDay <= 27);
     }
 
-    // ⭐ แก้ไขตรงนี้: หากเป็นรอบวันที่ 20 ให้คิดจาก 10 วัน, ถ้ารอบสิ้นเดือนให้คิดจาก 20 หรือ work_days เต็ม
-    const rawWorkDays = Number(payroll?.work_days) || 30;
-    let workedDays = rawWorkDays;
-    if (targetRound === 20) {
-      workedDays = 10; // รอบวันที่ 20 คิดจากวันทำงาน 10 วัน (ช่วง 11-20)
-    } else {
-      workedDays = rawWorkDays > 20 ? rawWorkDays : 20; // รอบสิ้นเดือนคิดตามสัดส่วน
-    }
+    // ⭐ กำหนดให้วันทำงานคิดจากฐาน 20 วันเต็ม (เพื่อให้ได้วงเงินรวม 4,590 + 4,590 = 9,180)
+    const workedDays = 20;
 
     const grossIncome = dailyWage * workedDays;
     const maxCredit = Math.floor(grossIncome * 0.85);
@@ -58,7 +52,7 @@ export async function GET() {
     const netSalary = Number(payroll?.net_salary) || grossIncome;
     const totalDeductions = Number(payroll?.total_deductions) || 0;
 
-    // 3. ดึงประวัติการกู้และคำนวณยอดสะสมจากฟิลด์ amount
+    // 3. ดึงประวัติการกู้และคำนวณยอดสะสมจากฟิลด์ amount ของเดือนนี้
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
     const { data: monthLoans } = await supabase
       .from("loan_requests")
@@ -68,6 +62,8 @@ export async function GET() {
       .neq("status", "REJECTED");
 
     const totalBorrowedThisMonth = (monthLoans || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    
+    // คำนวณวงเงินคงเหลือจากสิทธิ์ 20 วันเต็ม หักลบด้วยยอดที่กู้ไปแล้วในเดือนนี้
     const remainingCredit = Math.max(0, maxCredit - totalBorrowedThisMonth);
 
     const { data: allLoans } = await supabase
