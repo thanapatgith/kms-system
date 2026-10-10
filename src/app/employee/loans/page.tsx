@@ -7,11 +7,12 @@ export default function EmployeeLoansPage() {
   const [loans, setLoans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // ⭐ แก้ไขค่าเริ่มต้น (Initial State) ให้ตรงกับฐานข้อมูลจริง (workedDays: 20, dailyWage: 540)
   const [loanSummary, setLoanSummary] = useState({
     targetRound: 20 as 20 | 30,
     isWindowOpen: false,
-    workedDays: 10,
-    dailyWage: 520,
+    workedDays: 20,
+    dailyWage: 540,
     maxCredit: 0,
     totalBorrowedThisMonth: 0,
     remainingCredit: 0,
@@ -42,8 +43,8 @@ export default function EmployeeLoansPage() {
         setLoanSummary({
           targetRound: data.targetRound || 20,
           isWindowOpen: data.isWindowOpen,
-          workedDays: data.workedDays || 10,
-          dailyWage: data.dailyWage || 520,
+          workedDays: data.workedDays || 20,
+          dailyWage: data.dailyWage || 540,
           maxCredit: data.maxCredit || 0,
           totalBorrowedThisMonth: data.totalBorrowedThisMonth || 0,
           remainingCredit: data.remainingCredit || 0,
@@ -119,7 +120,7 @@ export default function EmployeeLoansPage() {
       {/* Main Content */}
       <main className="max-w-md mx-auto px-4 mt-5 space-y-4">
         
-       {/* การ์ดสรุปวงเงิน & สิทธิ์คงเหลือ - ป้ายสถานะ 2 บรรทัด */}
+       {/* การ์ดสรุปวงเงิน & สิทธิ์คงเหลือ */}
         <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-5 shadow-xl space-y-4 border border-slate-700">
           <div className="flex justify-between items-start gap-2">
             <div>
@@ -131,7 +132,6 @@ export default function EmployeeLoansPage() {
               </p>
             </div>
             
-            {/* ปรับป้ายสถานะเป็น 2 บรรทัด */}
             <div className={`px-3 py-2 text-xs font-bold rounded-2xl border text-center shrink-0 ${
               loanSummary.isWindowOpen 
                 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 animate-pulse" 
@@ -170,14 +170,14 @@ export default function EmployeeLoansPage() {
           </div>
         </div>
 
-       {/* ยื่นคำร้องกู้ยืมเงิน - เพิ่ม Padding และจัดระยะไม่ให้ชิดขอบ */}
+       {/* ยื่นคำร้องกู้ยืมเงิน */}
         <div className="bg-white rounded-2xl shadow-sm p-5 border-2 border-slate-200 space-y-4">
           <div className="space-y-1">
             <h3 className="text-sm font-extrabold text-slate-900 leading-snug">
               ยื่นคำร้องกู้ยืมเงิน รอบวันที่ {loanSummary.targetRound}
             </h3>
             <p className="text-xs text-slate-500 font-medium">
-              เปิดให้ยื่นเรื่องวันที่ {loanSummary.targetRound === 20 ? "11-17" : "18-27"} ของเดือนนี้
+              เปิดให้ยื่นเรื่องวันที่ {loanSummary.targetRound === 20 ? "11-20" : "21-30"} ของเดือนนี้
             </p>
           </div>
 
@@ -207,7 +207,7 @@ export default function EmployeeLoansPage() {
           </div>
         </div>
 
-        {/* แจ้งเตือนเรื่องการคิดดอกเบี้ยและสรุปยอดหัก */}
+        {/* แจ้งเตือนเรื่องการคิดดอกเบี้ย */}
         {loanSummary.totalBorrowedThisMonth >= 4000 && (
           <div className="p-4 bg-amber-50 border-2 border-amber-200 rounded-2xl text-amber-900 text-xs space-y-2 shadow-sm">
             <div className="flex items-center gap-2 font-extrabold text-amber-950 text-sm">
@@ -396,7 +396,7 @@ export default function EmployeeLoansPage() {
 
       </main>
 
-      {/* Bottom Navigation Bar - สว่างและตัวหนังสือใหญ่ชัดเจน */}
+      {/* Bottom Navigation Bar */}
       <nav className="fixed bottom-0 left-0 right-0 bg-slate-950 border-t-2 border-slate-800 px-3 py-3 flex justify-around items-center z-50 shadow-2xl">
         <Link href="/employee/profile" className="flex flex-col items-center text-slate-200 hover:text-orange-400 text-xs font-extrabold transition">
           <span className="text-2xl mb-1">👤</span>
