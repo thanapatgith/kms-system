@@ -38,13 +38,13 @@ export async function GET() {
     let targetRound = 20;
     let isWindowOpen = false;
 
-    // กำหนดรอบและเช็คช่วงวันเปิดให้ยื่นเรื่อง
+    // ⭐ กำหนดรอบและเช็คช่วงวันเปิดให้ยื่นเรื่อง (รอบ 20 เปิด 11-17, รอบ 30 เปิด 21-27)
     if (currentDay >= 1 && currentDay <= 20) {
       targetRound = 20;
-      isWindowOpen = (currentDay >= 11 && currentDay <= 20);
+      isWindowOpen = (currentDay >= 11 && currentDay <= 17);
     } else {
       targetRound = 30; // รอบสิ้นเดือน
-      isWindowOpen = (currentDay >= 21 && currentDay <= 30);
+      isWindowOpen = (currentDay >= 21 && currentDay <= 27);
     }
 
     // 3. ดึงประวัติการกู้เฉพาะของเดือนปัจจุบันเพื่อเช็คว่าเคยกู้รอบ 20 หรือยัง
@@ -58,7 +58,7 @@ export async function GET() {
 
     const borrowedInRound20 = (monthLoans || []).some(item => {
       const d = new Date(item.created_at).getDate();
-      return d >= 11 && d <= 20;
+      return d >= 11 && d <= 17;
     });
 
     // ⭐ กำหนดวันทำงานตามรอบให้ถูกต้อง:
