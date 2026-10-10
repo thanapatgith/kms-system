@@ -18,33 +18,48 @@ export async function GET() {
       .eq("id", session.userId)
       .single();
 
-    // 2. ดึงข้อมูลเงินเดือนจากตาราง payrolls
+    // ⭐ ดึงวัน เดือน ปี ตามเวลาประเทศไทย (Asia/Bangkok) เพื่อแก้ปัญหา Timezone บน Vercel (UTC)
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Bangkok",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const parts = formatter.formatToParts(now);
+    const yearPart = parts.find(p => p.type === "year")?.value || String(now.getFullYear());
+    const monthPart = parts.find(p => p.type === "month")?.value || String(now.getMonth() + 1).padStart(2, "0");
+    const dayPart = parts.find(p => p.type === "day")?.value || String(now.getDate());
+
+    const currentYear = Number(yearPart);
+    const currentMonth = monthPart;
+    const currentDay = Number(dayPart);
+    const currentBillingPeriod = `${currentYear}-${currentMonth}`;
+
+    // 2. ดึงข้อมูลเงินเดือนจากตาราง payrolls ของเดือนปัจจุบัน
     const { data: payroll } = await supabase
       .from("payrolls")
-      .select("daily_wage, work_days, gross_income, net_salary, total_deductions, billing_period")
+      .select("daily_wage, work_days, gross_income, net_salary, total_deductions")
       .eq("employee_code", userProfile?.employee_code?.trim())
-      .or(`billing_period.eq.2026-10,billing_period.eq.2026-09,billing_period.eq.2026-08`)
+      .or(`billing_period.eq.${currentBillingPeriod},billing_period.eq.2026-10,billing_period.eq.2026-09`)
       .maybeSingle();
 
-    const dailyWage = Number(payroll?.daily_wage) || 560;
-    
-    const now = new Date();
-    const currentDay = now.getDate();
+    const dailyWage = Number(payroll?.daily_wage) || 540;
     
     let targetRound = 20;
     let isWindowOpen = false;
 
-    // กำหนดรอบและเช็คช่วงวันเปิดให้ยื่นเรื่อง
+    // ⭐ กำหนดรอบและเช็คช่วงวันเปิดให้ยื่นเรื่อง (รอบ 20 เปิด 11-17, รอบ 30 เปิด 21-27)
     if (currentDay >= 1 && currentDay <= 20) {
       targetRound = 20;
-      isWindowOpen = (currentDay >= 11 && currentDay <= 20);
+      isWindowOpen = (currentDay >= 11 && currentDay <= 17);
     } else {
       targetRound = 30; // รอบสิ้นเดือน
-      isWindowOpen = (currentDay >= 21 && currentDay <= 30);
+      isWindowOpen = (currentDay >= 21 && currentDay <= 27);
     }
 
-    // 3. ดึงประวัติการกู้ของเดือนนี้ เพื่อเช็คว่าเคยกู้รอบ 20 ไปหรือยัง
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    // 3. ดึงประวัติการกู้เฉพาะของเดือนปัจจุบันเพื่อเช็คว่าเคยกู้รอบ 20 หรือยัง
+    const startOfMonth = new Date(Date.UTC(currentYear, Number(currentMonth) - 1, 1, 0, 0, 0)).toISOString();
     const { data: monthLoans } = await supabase
       .from("loan_requests")
       .select("*")
@@ -53,13 +68,12 @@ export async function GET() {
       .neq("status", "REJECTED");
 
     const borrowedInRound20 = (monthLoans || []).some(item => {
-      const d = new Date(item.created_at).getDate();
-      return d >= 11 && d <= 20;
+      const itemDate = new Date(item.created_at);
+      const itemDay = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Bangkok", day: "numeric" }).format(itemDate));
+      return itemDay >= 11 && itemDay <= 17;
     });
 
-    // ⭐ กำหนดวันทำงานตามกฎจริง:
-    // - รอบ 20: ใช้ 10 วันเสมอ
-    // - รอบ 30: ถ้ายื่นกู้รอบ 20 ไปแล้ว จะเหลือ 10 วัน, ถ้ายังไม่เคยจะได้ 20 วันเต็ม
+    // กำหนดวันทำงานตามรอบ
     let workedDays = 10;
     if (targetRound === 20) {
       workedDays = 10;
@@ -113,7 +127,6 @@ export async function GET() {
   }
 }
 
-// 4. ฟังก์ชัน POST บันทึกข้อมูล
 export async function POST(req: Request) {
   try {
     const session = await getSession();

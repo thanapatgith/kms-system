@@ -7,7 +7,6 @@ export default function SupervisorLoansPage() {
   const [loans, setLoans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // ⭐ ไม่ฮาร์ดโค้ด: เริ่มต้นด้วยค่า 0 เพื่อรอโหลดข้อมูลจริงจาก API Backend
   const [loanSummary, setLoanSummary] = useState({
     targetRound: 20 as 20 | 30,
     isWindowOpen: false,
@@ -18,16 +17,43 @@ export default function SupervisorLoansPage() {
     remainingCredit: 0,
   });
 
-  const getTodayString = () => {
+  // ฟังก์ชันคำนวณช่วงวันต่างๆ ของเดือนปัจจุบัน
+  const getCurrentMonthRanges = () => {
     const today = new Date();
     const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const day = String(today.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    const month = today.getMonth();
+
+    const format = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    // รอบวันที่ 20 (วันที่ 11 - 17 ของเดือน)
+    const round20Start = new Date(year, month, 11);
+    const round20End = new Date(year, month, 17);
+
+    // รอบวันที่ 30 (วันที่ 21 - 27 ของเดือน)
+    const round30Start = new Date(year, month, 21);
+    const round30End = new Date(year, month, 27);
+
+    return {
+      thisMonth: { start: format(firstDay), end: format(lastDay) },
+      round20: { start: format(round20Start), end: format(round20End) },
+      round30: { start: format(round30Start), end: format(round30End) },
+    };
   };
 
-  const [fromDate, setFromDate] = useState<string>("");
-  const [toDate, setToDate] = useState<string>("");
+  const ranges = getCurrentMonthRanges();
+
+  // ตั้งค่าเริ่มต้นให้แสดง "เดือนนี้" เป็นอันดับแรก
+  const [fromDate, setFromDate] = useState<string>(ranges.thisMonth.start);
+  const [toDate, setToDate] = useState<string>(ranges.thisMonth.end);
+  const [activeFilter, setActiveFilter] = useState<string>("THIS_MONTH");
 
   useEffect(() => {
     fetchLoans();
@@ -40,7 +66,6 @@ export default function SupervisorLoansPage() {
       const data = await res.json();
       if (data.success) {
         setLoans(data.loans || []);
-        // รับค่าคำนวณจริงจาก API Backend แบบไดนามิก 100%
         setLoanSummary({
           targetRound: data.targetRound || 20,
           isWindowOpen: data.isWindowOpen ?? false,
@@ -58,25 +83,18 @@ export default function SupervisorLoansPage() {
     }
   };
 
-  const setQuickDate = (type: "TODAY" | "LAST_7_DAYS" | "ALL") => {
-    if (type === "TODAY") {
-      const today = getTodayString();
-      setFromDate(today);
-      setToDate(today);
-    } else if (type === "LAST_7_DAYS") {
-      const today = new Date();
-      const past7 = new Date();
-      past7.setDate(today.getDate() - 6);
-
-      const format = (d: Date) => {
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${y}-${m}-${day}`;
-      };
-
-      setFromDate(format(past7));
-      setToDate(format(today));
+  const handleQuickFilter = (type: "ROUND_20" | "ROUND_30" | "THIS_MONTH" | "ALL") => {
+    setActiveFilter(type);
+    const r = getCurrentMonthRanges();
+    if (type === "ROUND_20") {
+      setFromDate(r.round20.start);
+      setToDate(r.round20.end);
+    } else if (type === "ROUND_30") {
+      setFromDate(r.round30.start);
+      setToDate(r.round30.end);
+    } else if (type === "THIS_MONTH") {
+      setFromDate(r.thisMonth.start);
+      setToDate(r.thisMonth.end);
     } else if (type === "ALL") {
       setFromDate("");
       setToDate("");
@@ -235,51 +253,81 @@ export default function SupervisorLoansPage() {
           </div>
         )}
 
-        {/* ตัวกรองช่วงวันที่ */}
+        {/* ตัวกรองช่วงรอบบิล */}
         <div className="bg-white rounded-2xl shadow-sm p-4 border-2 border-slate-200 space-y-3">
           <div className="flex justify-between items-center">
-            <span className="text-sm font-extrabold text-slate-900">📅 ค้นหาตามช่วงวันที่</span>
-            <div className="flex gap-1.5">
-              <button
-                type="button"
-                onClick={() => setQuickDate("TODAY")}
-                className="px-2.5 py-1.5 bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 transition cursor-pointer"
-              >
-                วันนี้
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickDate("LAST_7_DAYS")}
-                className="px-2.5 py-1.5 bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 transition cursor-pointer"
-              >
-                7 วันล่าสุด
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickDate("ALL")}
-                className="px-2.5 py-1.5 bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 transition cursor-pointer"
-              >
-                ดูทั้งหมด
-              </button>
-            </div>
+            <span className="text-sm font-extrabold text-slate-900">📅 ค้นหาตามช่วงรอบบิล</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5 text-xs">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => handleQuickFilter("ROUND_20")}
+              className={`py-2 px-3 text-xs font-bold rounded-xl border transition cursor-pointer text-center ${
+                activeFilter === "ROUND_20"
+                  ? "bg-amber-500 text-slate-950 border-amber-500 shadow-sm"
+                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+              }`}
+            >
+              รอบวันที่ 20 (11-17)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickFilter("ROUND_30")}
+              className={`py-2 px-3 text-xs font-bold rounded-xl border transition cursor-pointer text-center ${
+                activeFilter === "ROUND_30"
+                  ? "bg-amber-500 text-slate-950 border-amber-500 shadow-sm"
+                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+              }`}
+            >
+              รอบวันที่ 30 (21-27)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickFilter("THIS_MONTH")}
+              className={`py-2 px-3 text-xs font-bold rounded-xl border transition cursor-pointer text-center ${
+                activeFilter === "THIS_MONTH"
+                  ? "bg-amber-500 text-slate-950 border-amber-500 shadow-sm"
+                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+              }`}
+            >
+              เดือนนี้ (ทั้งเดือน)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickFilter("ALL")}
+              className={`py-2 px-3 text-xs font-bold rounded-xl border transition cursor-pointer text-center ${
+                activeFilter === "ALL"
+                  ? "bg-amber-500 text-slate-950 border-amber-500 shadow-sm"
+                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+              }`}
+            >
+              ดูทั้งหมด
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5 text-xs pt-1 border-t border-slate-100">
             <div>
-              <label className="block text-xs text-slate-600 font-bold mb-1">ตั้งแต่วันที่:</label>
+              <label className="block text-xs text-slate-500 font-semibold mb-1">ตั้งแต่วันที่:</label>
               <input
                 type="date"
                 value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
+                onChange={(e) => {
+                  setFromDate(e.target.value);
+                  setActiveFilter("");
+                }}
                 className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold outline-none focus:bg-white focus:ring-2 focus:ring-amber-500 cursor-pointer text-sm"
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-600 font-bold mb-1">ถึงวันที่:</label>
+              <label className="block text-xs text-slate-500 font-semibold mb-1">ถึงวันที่:</label>
               <input
                 type="date"
                 value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
+                onChange={(e) => {
+                  setToDate(e.target.value);
+                  setActiveFilter("");
+                }}
                 className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 font-bold outline-none focus:bg-white focus:ring-2 focus:ring-amber-500 cursor-pointer text-sm"
               />
             </div>
