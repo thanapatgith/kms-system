@@ -18,10 +18,22 @@ export async function GET() {
       .eq("id", session.userId)
       .single();
 
-    // สร้างค่าปีและเดือนปัจจุบันแบบ Dynamic
+    // ⭐ ดึงวัน เดือน ปี ตามเวลาประเทศไทย (Asia/Bangkok) เพื่อแก้ปัญหา Timezone บน Vercel (UTC)
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Bangkok",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const parts = formatter.formatToParts(now);
+    const yearPart = parts.find(p => p.type === "year")?.value || String(now.getFullYear());
+    const monthPart = parts.find(p => p.type === "month")?.value || String(now.getMonth() + 1).padStart(2, "0");
+    const dayPart = parts.find(p => p.type === "day")?.value || String(now.getDate());
+
+    const currentYear = Number(yearPart);
+    const currentMonth = monthPart;
+    const currentDay = Number(dayPart);
     const currentBillingPeriod = `${currentYear}-${currentMonth}`;
 
     // 2. ดึงข้อมูลเงินเดือนจากตาราง payrolls ของเดือนปัจจุบัน
@@ -33,7 +45,6 @@ export async function GET() {
       .maybeSingle();
 
     const dailyWage = Number(payroll?.daily_wage) || 540;
-    const currentDay = now.getDate();
     
     let targetRound = 20;
     let isWindowOpen = false;
@@ -48,7 +59,7 @@ export async function GET() {
     }
 
     // 3. ดึงประวัติการกู้เฉพาะของเดือนปัจจุบันเพื่อเช็คว่าเคยกู้รอบ 20 หรือยัง
-    const startOfMonth = new Date(currentYear, now.getMonth(), 1).toISOString();
+    const startOfMonth = new Date(Date.UTC(currentYear, Number(currentMonth) - 1, 1, 0, 0, 0)).toISOString();
     const { data: monthLoans } = await supabase
       .from("loan_requests")
       .select("*")
@@ -57,13 +68,12 @@ export async function GET() {
       .neq("status", "REJECTED");
 
     const borrowedInRound20 = (monthLoans || []).some(item => {
-      const d = new Date(item.created_at).getDate();
-      return d >= 11 && d <= 17;
+      const itemDate = new Date(item.created_at);
+      const itemDay = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Bangkok", day: "numeric" }).format(itemDate));
+      return itemDay >= 11 && itemDay <= 17;
     });
 
-    // ⭐ กำหนดวันทำงานตามรอบให้ถูกต้อง:
-    // - รอบ 20: คิดจาก 10 วันเสมอ
-    // - รอบ 30: ถ้ายื่นกู้รอบ 20 ไปแล้ว จะเหลือ 10 วัน, แต่ถ้ายังไม่เคยยื่นรอบ 20 จะได้ 20 วันเต็ม
+    // กำหนดวันทำงานตามรอบ
     let workedDays = 10;
     if (targetRound === 20) {
       workedDays = 10;
