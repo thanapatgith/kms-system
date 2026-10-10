@@ -21,12 +21,12 @@ export async function GET() {
     // 2. ดึงข้อมูลเงินเดือนจากตาราง payrolls
     const { data: payroll } = await supabase
       .from("payrolls")
-      .select("daily_wage, work_days, gross_income, net_salary, total_deductions")
+      .select("daily_wage, work_days, gross_income, net_salary, total_deductions, billing_period")
       .eq("employee_code", userProfile?.employee_code?.trim())
-      .or(`billing_period.eq.2026-08,billing_period.eq.1/8/2026,billing_period.eq.2026-07,billing_period.eq.1/7/2026`)
+      .or(`billing_period.eq.2026-10,billing_period.eq.2026-09,billing_period.eq.2026-08`)
       .maybeSingle();
 
-    const dailyWage = payroll?.daily_wage || 520;
+    const dailyWage = Number(payroll?.daily_wage) || 560;
     
     const now = new Date();
     const currentDay = now.getDate();
@@ -35,7 +35,7 @@ export async function GET() {
     let isWindowOpen = false;
 
     // กำหนดรอบและเช็คช่วงวันเปิดให้ยื่นเรื่อง
-    if (currentDay >= 11 && currentDay <= 20) {
+    if (currentDay >= 1 && currentDay <= 20) {
       targetRound = 20;
       isWindowOpen = (currentDay >= 11 && currentDay <= 20);
     } else {
@@ -43,17 +43,8 @@ export async function GET() {
       isWindowOpen = (currentDay >= 21 && currentDay <= 30);
     }
 
-    // ⭐ กำหนดให้วันทำงานคิดจากฐาน 20 วันเต็ม (เพื่อให้ได้วงเงินรวม 4,590 + 4,590 = 9,180)
-    const workedDays = 20;
-
-    const grossIncome = dailyWage * workedDays;
-    const maxCredit = Math.floor(grossIncome * 0.85);
-
-    const netSalary = Number(payroll?.net_salary) || grossIncome;
-    const totalDeductions = Number(payroll?.total_deductions) || 0;
-
-    // 3. ดึงประวัติการกู้และคำนวณยอดสะสมจากฟิลด์ amount ของเดือนนี้
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+    // 3. ดึงประวัติการกู้ของเดือนนี้ เพื่อเช็คว่าเคยกู้รอบ 20 ไปหรือยัง
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const { data: monthLoans } = await supabase
       .from("loan_requests")
       .select("*")
@@ -61,9 +52,30 @@ export async function GET() {
       .gte("created_at", startOfMonth)
       .neq("status", "REJECTED");
 
+    const borrowedInRound20 = (monthLoans || []).some(item => {
+      const d = new Date(item.created_at).getDate();
+      return d >= 11 && d <= 20;
+    });
+
+    // ⭐ กำหนดวันทำงานตามกฎจริง:
+    // - รอบ 20: ใช้ 10 วันเสมอ
+    // - รอบ 30: ถ้ายื่นกู้รอบ 20 ไปแล้ว จะเหลือ 10 วัน, ถ้ายังไม่เคยจะได้ 20 วันเต็ม
+    let workedDays = 10;
+    if (targetRound === 20) {
+      workedDays = 10;
+    } else {
+      workedDays = borrowedInRound20 ? 10 : 20;
+    }
+
+    const grossIncome = dailyWage * workedDays;
+    const maxCredit = Math.floor(grossIncome * 0.85);
+
+    const netSalary = Number(payroll?.net_salary) || grossIncome;
+    const totalDeductions = Number(payroll?.total_deductions) || 0;
+
     const totalBorrowedThisMonth = (monthLoans || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     
-    // คำนวณวงเงินคงเหลือจากสิทธิ์ 20 วันเต็ม หักลบด้วยยอดที่กู้ไปแล้วในเดือนนี้
+    // คำนวณวงเงินคงเหลือ
     const remainingCredit = Math.max(0, maxCredit - totalBorrowedThisMonth);
 
     const { data: allLoans } = await supabase
@@ -85,7 +97,12 @@ export async function GET() {
       totalBorrowedThisMonth,
       remainingCredit,
       loans: allLoans || [],
-    }, { status: 200 });
+    }, {
+      status: 200,
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      },
+    });
 
   } catch (error: any) {
     console.error("Get loan error:", error);
@@ -96,7 +113,7 @@ export async function GET() {
   }
 }
 
-// 4. ฟังก์ชัน POST บันทึกข้อมูลตามโครงสร้างตารางจริง
+// 4. ฟังก์ชัน POST บันทึกข้อมูล
 export async function POST(req: Request) {
   try {
     const session = await getSession();

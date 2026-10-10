@@ -25,9 +25,9 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: "ไม่พบข้อมูลผู้ใช้งาน" }, { status: 404 });
     }
 
-    let dailyRate = 520;
+    let dailyRate = 540; // ค่าเริ่มต้นมาตรฐาน
     let baseWage8Hrs = 400; 
-    let otRate4Hrs = 120; 
+    let otRate4Hrs = 140; 
     let branchName = "ยังไม่ระบุหน่วยงาน";
 
     const siteId = user.site_id || user.siteId;
@@ -54,39 +54,48 @@ export async function GET(req: Request) {
       }
     }
 
+    // สร้างค่าปีและเดือนปัจจุบันแบบ Dynamic
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const startDate = new Date(year, month, 1);
-    startDate.setHours(0, 0, 0, 0);
+    const currentYear = now.getFullYear();
+    const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+    const currentBillingPeriod = `${currentYear}-${currentMonth}`;
+    const currentDay = now.getDate();
 
-    let workedDays = Math.max(0, Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-
+    let workedDays = 20;
     let grossIncome = 0;
     let netSalary = 0;
     let totalDeductions = 0;
 
     if (user.employee_code) {
+      // ดึงข้อมูล payroll เฉพาะของรอบเดือนปัจจุบัน
       const { data: payrollData } = await supabase
         .from("payrolls")
-        .select("wage, overtime_pay, daily_wage, gross_income, net_salary, total_deductions, site_name")
+        .select("wage, overtime_pay, daily_wage, gross_income, net_salary, total_deductions, site_name, work_days, billing_period")
         .eq("employee_code", user.employee_code.trim())
+        .or(`billing_period.eq.${currentBillingPeriod},billing_period.eq.2026-10,billing_period.eq.2026-09`)
         .maybeSingle();
 
       if (payrollData) {
-        const dbWage = Number(payrollData.wage) || 400; 
-        const dbOtPerHour = Number(payrollData.overtime_pay) || 30; 
+        const dbDailyWage = Number(payrollData.daily_wage) || 540;
+        dailyRate = dbDailyWage;
 
-        baseWage8Hrs = dbWage;
-        otRate4Hrs = dbOtPerHour * 4; 
-        dailyRate = baseWage8Hrs + otRate4Hrs; 
+        // กำหนดวันทำงานตามรอบ (รอบวันที่ 20 คิดจาก 10 วัน, รอบวันที่ 30 คิดจาก 20 วัน)
+        if (payrollData.work_days) {
+          workedDays = Number(payrollData.work_days);
+        } else {
+          workedDays = (currentDay >= 1 && currentDay <= 20) ? 10 : 20;
+        }
 
-        totalDeductions = Number(payrollData?.total_deductions) || 0;
+        totalDeductions = Number(payrollData.total_deductions) || 0;
 
         if (branchName === "ยังไม่ระบุหน่วยงาน" && payrollData?.site_name && payrollData.site_name !== "หน่วยงานสังกัด KMS") {
           branchName = payrollData.site_name;
         }
+      } else {
+        workedDays = (currentDay >= 1 && currentDay <= 20) ? 10 : 20;
       }
+    } else {
+      workedDays = (currentDay >= 1 && currentDay <= 20) ? 10 : 20;
     }
 
     grossIncome = dailyRate * workedDays;
@@ -120,8 +129,7 @@ export async function GET(req: Request) {
       },
     }, {
       headers: {
-        // ⭐ เพิ่ม Cache ชั่วคราว 30 วินาที เพื่อช่วยลดการยิง Request โปรไฟล์ซ้ำๆ
-        'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
       },
     });
   } catch (error: any) {
