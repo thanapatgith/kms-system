@@ -5,6 +5,7 @@ import React, { useState } from "react";
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false); // ⭐ เพิ่ม State สำหรับเปิด/ปิดรหัสผ่าน
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -32,10 +33,8 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok && data.ok) {
-        // 1. แปลง Role เป็นตัวพิมพ์ใหญ่เพื่อความชัวร์
         const userRole = data.user?.role?.toUpperCase();
 
-        // 2. แยกเส้นทางตาม Role รวมถึง CLIENT ไปที่ /client/dashboard
         if (userRole === "CLIENT") {
           window.location.href = "/client/dashboard";
         } else if (userRole === "CEO") {
@@ -80,14 +79,25 @@ export default function LoginPage() {
 
           <label className="grid gap-2 text-sm font-semibold text-slate-700">
             Password
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-sm"
-            />
+            <div className="relative">
+              {/* ⭐ เปลี่ยน type เป็น dynamic ตามค่า showPassword และเพิ่ม pr-12 เพื่อเว้นพื้นที่ให้ปุ่มไอคอน */}
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 pr-12 text-slate-900 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-sm"
+              />
+              {/* ⭐ ปุ่มคลิกเปิด/ปิดการมองเห็นรหัสผ่าน */}
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer text-lg"
+              >
+                {showPassword ? "🙈" : "👁️"}
+              </button>
+            </div>
           </label>
 
           {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
