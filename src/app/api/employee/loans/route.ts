@@ -18,7 +18,7 @@ export async function GET() {
       .eq("id", session.userId)
       .single();
 
-    // ⭐ ดึงวัน เดือน ปี ตามเวลาประเทศไทย (Asia/Bangkok) เพื่อแก้ปัญหา Timezone บน Vercel (UTC)
+    // ดึงวัน เดือน ปี ตามเวลาประเทศไทย (Asia/Bangkok)
     const now = new Date();
     const formatter = new Intl.DateTimeFormat("en-US", {
       timeZone: "Asia/Bangkok",
@@ -49,7 +49,7 @@ export async function GET() {
     let targetRound = 20;
     let isWindowOpen = false;
 
-    // ⭐ กำหนดรอบและเช็คช่วงวันเปิดให้ยื่นเรื่อง (รอบ 20 เปิด 11-17, รอบ 30 เปิด 21-27)
+    // กำหนดรอบและเช็คช่วงวันเปิดให้ยื่นเรื่อง (รอบ 20 เปิด 11-17, รอบ 30 เปิด 21-27)
     if (currentDay >= 1 && currentDay <= 20) {
       targetRound = 20;
       isWindowOpen = (currentDay >= 11 && currentDay <= 17);
@@ -58,7 +58,7 @@ export async function GET() {
       isWindowOpen = (currentDay >= 21 && currentDay <= 27);
     }
 
-    // 3. ดึงประวัติการกู้เฉพาะของเดือนปัจจุบันเพื่อเช็คว่าเคยกู้รอบ 20 หรือยัง
+    // 3. ดึงประวัติการกู้เฉพาะของเดือนปัจจุบัน
     const startOfMonth = new Date(Date.UTC(currentYear, Number(currentMonth) - 1, 1, 0, 0, 0)).toISOString();
     const { data: monthLoans } = await supabase
       .from("loan_requests")
@@ -67,30 +67,18 @@ export async function GET() {
       .gte("created_at", startOfMonth)
       .neq("status", "REJECTED");
 
-    const borrowedInRound20 = (monthLoans || []).some(item => {
-      const itemDate = new Date(item.created_at);
-      const itemDay = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Bangkok", day: "numeric" }).format(itemDate));
-      return itemDay >= 11 && itemDay <= 17;
-    });
-
-    // กำหนดวันทำงานตามรอบ
-    let workedDays = 10;
-    if (targetRound === 20) {
-      workedDays = 10;
-    } else {
-      workedDays = borrowedInRound20 ? 10 : 20;
-    }
-
-    const grossIncome = dailyWage * workedDays;
-    const maxCredit = Math.floor(grossIncome * 0.85);
-
-    const netSalary = Number(payroll?.net_salary) || grossIncome;
-    const totalDeductions = Number(payroll?.total_deductions) || 0;
+    // ⭐ คำนวณสิทธิ์รวมทั้งเดือนจากฐาน 20 วัน (รอบละ 10 วัน รวม 2 รอบ) ทบกัน
+    const workedDaysTotal = 20; 
+    const grossIncomeTotal = dailyWage * workedDaysTotal;
+    const maxCreditTotal = Math.floor(grossIncomeTotal * 0.85); // วงเงินรวมสูงสุดต่อเดือน
 
     const totalBorrowedThisMonth = (monthLoans || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     
-    // คำนวณวงเงินคงเหลือ
-    const remainingCredit = Math.max(0, maxCredit - totalBorrowedThisMonth);
+    // ⭐ คำนวณวงเงินคงเหลือ = วงเงินรวมทั้งเดือน - ยอดกู้สะสมทั้งเดือน (นำมาทบหักลบกันถูกต้อง)
+    const remainingCredit = Math.max(0, maxCreditTotal - totalBorrowedThisMonth);
+
+    const netSalary = Number(payroll?.net_salary) || grossIncomeTotal;
+    const totalDeductions = Number(payroll?.total_deductions) || 0;
 
     const { data: allLoans } = await supabase
       .from("loan_requests")
@@ -102,14 +90,14 @@ export async function GET() {
       success: true,
       targetRound,
       isWindowOpen,
-      workedDays,
+      workedDays: 10, // แสดงวันทำงานต่อรอบ (10 วัน) บนการ์ด
       dailyWage,
-      grossIncome,
+      grossIncome: dailyWage * 10,
       netSalary,
       totalDeductions,
-      maxCredit,
+      maxCredit: Math.floor((dailyWage * 10) * 0.85), // แสดงวงเงินเต็มสิทธิ์ต่อรอบปกติ
       totalBorrowedThisMonth,
-      remainingCredit,
+      remainingCredit, // ยอดคงเหลือที่หักทบยอดรวมทั้งเดือนเรียบร้อยแล้ว
       loans: allLoans || [],
     }, {
       status: 200,
