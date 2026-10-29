@@ -253,7 +253,7 @@ export default function EmployeeLoansPage() {
           </div>
         )}
 
-        {/* ตัวกรองช่วงวันที่ (ปรับปุ่มเป็น 11-17 และ 21-27) */}
+        {/* ตัวกรองช่วงวันที่ */}
         <div className="bg-white rounded-2xl shadow-sm p-4 border-2 border-slate-200 space-y-3">
           <div className="flex justify-between items-center">
             <span className="text-sm font-extrabold text-slate-900">📅 ค้นหาตามช่วงรอบบิล</span>
@@ -360,6 +360,9 @@ export default function EmployeeLoansPage() {
                 const interestAmount = isOverInterestThreshold ? amount * 0.05 : 0;
                 const totalDeduction = amount + interestAmount;
                 const createdAt = item.created_at || item.createdAt;
+                
+                // ดึงเหตุผลการไม่อนุมัติ (รองรับฟิลด์ reject_reason, admin_note, หรือ rejection_reason)
+                const rejectReason = item.reject_reason || item.admin_note || item.rejection_reason;
 
                 return (
                   <div key={item.id} className="p-4 bg-slate-50 rounded-2xl border-2 border-slate-200 space-y-3 text-sm shadow-sm">
@@ -425,8 +428,16 @@ export default function EmployeeLoansPage() {
 
                       {item.reason && (
                         <div className="pt-1.5 border-t border-slate-100 text-xs">
-                          <span className="text-slate-400 font-semibold">เหตุผล: </span>
+                          <span className="text-slate-400 font-semibold">เหตุผลที่ขอ: </span>
                           <span className="font-bold text-slate-900">"{item.reason}"</span>
+                        </div>
+                      )}
+
+                      {/* ⭐ แสดงเหตุผลไม่อนุมัติ ถ้าสถานะเป็น REJECTED และมีข้อความ */}
+                      {item.status === "REJECTED" && rejectReason && (
+                        <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs space-y-0.5 mt-2">
+                          <span className="font-bold text-red-700 block">❌ เหตุผลที่ไม่ผ่านอนุมัติ:</span>
+                          <span className="text-red-900 font-medium">"{rejectReason}"</span>
                         </div>
                       )}
                     </div>

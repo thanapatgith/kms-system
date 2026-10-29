@@ -11,10 +11,10 @@ export async function GET() {
       return NextResponse.json({ error: "ยังไม่ได้เข้าสู่ระบบ" }, { status: 401 });
     }
 
-    // 1. ดึง employee_code จากตาราง users
+    // 1. ดึงข้อมูลโปรไฟล์จากตาราง users
     const { data: userProfile } = await supabase
       .from("users")
-      .select("employee_code")
+      .select("*")
       .eq("id", session.userId)
       .single();
 
@@ -36,15 +36,19 @@ export async function GET() {
     const currentDay = Number(dayPart);
     const currentBillingPeriod = `${currentYear}-${currentMonth}`;
 
-    // 2. ดึงข้อมูลเงินเดือนจากตาราง payrolls ของเดือนปัจจุบัน
+    // 2. ดึงข้อมูลเงินเดือนจากตาราง payrolls
     const { data: payroll } = await supabase
       .from("payrolls")
-      .select("daily_wage, work_days, gross_income, net_salary, total_deductions")
+      .select("*")
       .eq("employee_code", userProfile?.employee_code?.trim())
       .or(`billing_period.eq.${currentBillingPeriod},billing_period.eq.2026-10,billing_period.eq.2026-09`)
+      .order("created_at", { ascending: false })
       .maybeSingle();
 
-    const dailyWage = Number(payroll?.daily_wage) || 540;
+    // นำ base_wage_8hrs และ ot_rate_4hrs มารวมกันเป็นเรทค่าจ้างรายวันจริง
+    const baseWage = Number(payroll?.base_wage_8hrs) || Number((userProfile as any)?.base_wage_8hrs) || 0;
+    const otRate = Number(payroll?.ot_rate_4hrs) || Number((userProfile as any)?.ot_rate_4hrs) || 0;
+    const dailyWage = baseWage + otRate;
     
     let targetRound = 20;
     let isWindowOpen = false;
@@ -67,14 +71,14 @@ export async function GET() {
       .gte("created_at", startOfMonth)
       .neq("status", "REJECTED");
 
-    // ⭐ คำนวณสิทธิ์รวมทั้งเดือนจากฐาน 20 วัน (รอบละ 10 วัน รวม 2 รอบ) ทบกัน
+    // คำนวณสิทธิ์รวมทั้งเดือนจากฐาน 20 วัน (รอบละ 10 วัน รวม 2 รอบ) ทบกัน
     const workedDaysTotal = 20; 
     const grossIncomeTotal = dailyWage * workedDaysTotal;
-    const maxCreditTotal = Math.floor(grossIncomeTotal * 0.85); // วงเงินรวมสูงสุดต่อเดือน
+    const maxCreditTotal = Math.floor(grossIncomeTotal * 0.85); // วงเงินรวมสูงสุดต่อเดือน (เช่น 8,840 บาท)
 
     const totalBorrowedThisMonth = (monthLoans || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     
-    // ⭐ คำนวณวงเงินคงเหลือ = วงเงินรวมทั้งเดือน - ยอดกู้สะสมทั้งเดือน (นำมาทบหักลบกันถูกต้อง)
+    // คำนวณวงเงินคงเหลือ = วงเงินรวมทั้งเดือน - ยอดกู้สะสมทั้งเดือน (เช่น 8,840 - 4,500 = 4,340 บาท)
     const remainingCredit = Math.max(0, maxCreditTotal - totalBorrowedThisMonth);
 
     const netSalary = Number(payroll?.net_salary) || grossIncomeTotal;
@@ -95,9 +99,9 @@ export async function GET() {
       grossIncome: dailyWage * 10,
       netSalary,
       totalDeductions,
-      maxCredit: Math.floor((dailyWage * 10) * 0.85), // แสดงวงเงินเต็มสิทธิ์ต่อรอบปกติ
+      maxCredit: maxCreditTotal, // ⭐ ส่งยอดวงเงินรวมทั้งเดือน (20 วัน) ไปแสดงผล เพื่อให้สอดคล้องกับยอดคงเหลือ
       totalBorrowedThisMonth,
-      remainingCredit, // ยอดคงเหลือที่หักทบยอดรวมทั้งเดือนเรียบร้อยแล้ว
+      remainingCredit, // ยอดคงเหลือที่ถูกต้อง (8,840 - ยอดกู้สะสม)
       loans: allLoans || [],
     }, {
       status: 200,
