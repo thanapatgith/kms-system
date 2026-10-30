@@ -59,7 +59,7 @@ export async function GET() {
       isWindowOpen = (currentDay >= 11 && currentDay <= 17);
     } else {
       targetRound = 30; // รอบสิ้นเดือน
-      isWindowOpen = (currentDay >= 21 && currentDay <= 27);
+      isWindowOpen = (currentDay >= 21 && currentDay <= 30);
     }
 
     // 3. ดึงประวัติการกู้เฉพาะของเดือนปัจจุบัน
